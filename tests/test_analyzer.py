@@ -279,3 +279,9 @@ def test_web_samples_match_test_samples():
     web = Path(__file__).parent.parent / "esha" / "static" / "samples"
     for f in list(web.glob("*.eml")) + list(web.glob("*.msg")):
         assert f.read_bytes() == (SAMPLES / f.name).read_bytes(), f"{f.name} differs from tests/samples"
+
+
+def test_footer_credits_mha_and_links_source(client):
+    html = client.get("/").get_data(as_text=True)
+    assert "MHA by lnxg33k" in html and "GPL-3.0" in html
+    assert 'href="https://github.com/0xAnalyst/email-security-header-analyzer">Source code</a>' in html
