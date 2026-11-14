@@ -14,10 +14,9 @@ from pathlib import Path
 from .received import is_public_ip
 
 try:
-    import geoip2.database
-    import geoip2.errors
+    import maxminddb
 except Exception:  # pragma: no cover
-    geoip2 = None
+    maxminddb = None
 
 BUNDLED = Path(__file__).resolve().parent.parent / "static" / "data"
 
@@ -32,13 +31,14 @@ def _search_dirs() -> list[Path]:
 
 @cache
 def _reader(kind: str):
-    if geoip2 is None:
+    if maxminddb is None:
         return None
     for d in _search_dirs():
         path = d / f"GeoLite2-{kind}.mmdb"
         if path.is_file():
             try:
-                return geoip2.database.Reader(str(path))
+                # MODE_MEMORY works everywhere, including Pyodide in the browser (no mmap).
+                return maxminddb.open_database(str(path), maxminddb.MODE_MEMORY)
             except Exception:
                 continue
     return None
@@ -62,22 +62,22 @@ def lookup(ip: str | None) -> dict | None:
     city = _reader("City")
     country = _reader("Country")
     try:
-        if city is not None:
-            r = city.city(ip)
-            out.update(
-                iso_code=(r.country.iso_code or "").lower(), country=r.country.name,
-                city=r.city.name, latitude=r.location.latitude, longitude=r.location.longitude,
-            )
-        elif country is not None:
-            r = country.country(ip)
-            out.update(iso_code=(r.country.iso_code or "").lower(), country=r.country.name)
+        db = city if city is not None else country
+        rec = db.get(ip) if db is not None else None
+        if rec:
+            c = rec.get("country") or rec.get("registered_country") or {}
+            out.update(iso_code=(c.get("iso_code") or "").lower(), country=(c.get("names") or {}).get("en"))
+            if city is not None:
+                loc = rec.get("location") or {}
+                out.update(city=((rec.get("city") or {}).get("names") or {}).get("en"),
+                           latitude=loc.get("latitude"), longitude=loc.get("longitude"))
     except Exception:
         pass
     asn = _reader("ASN")
     if asn is not None:
         try:
-            a = asn.asn(ip)
-            out.update(asn=a.autonomous_system_number, as_org=a.autonomous_system_organization)
+            a = asn.get(ip) or {}
+            out.update(asn=a.get("autonomous_system_number"), as_org=a.get("autonomous_system_organization"))
         except Exception:
             pass
     return {k: v for k, v in out.items() if v} or None
