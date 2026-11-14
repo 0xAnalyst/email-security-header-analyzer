@@ -194,7 +194,7 @@
     if (r.origin) lines.push("Origin IP: " + r.origin.ip + (r.origin.geo && r.origin.geo.country ? " (" + r.origin.geo.country + ")" : ""));
     lines.push("", "Findings:");
     r.findings.filter(function (f) { return f.severity !== "pass" && f.severity !== "info"; })
-      .forEach(function (f) { lines.push("- [" + f.severity + "] " + f.title + (f.detail ? ": " + f.detail : "")); });
+      .forEach(function (f) { lines.push("- [" + f.severity + "] " + (f.rule_id ? f.rule_id + " " : "") + f.title + (f.detail ? ": " + f.detail : "")); });
     navigator.clipboard.writeText(lines.join("\n")).then(function () { toast("Summary copied"); }, function () { toast("Copy failed"); });
   });
 
@@ -273,9 +273,24 @@
     var important = r.findings.filter(function (f) { return f.severity !== "info"; });
     var notes = r.findings.filter(function (f) { return f.severity === "info"; });
     function item(f) {
+      var attack = (f.attack || []), more = null;
+      if (f.description || f.remediation || attack.length) {
+        var al = null;
+        if (attack.length) {
+          al = h("p", { class: "f-attack" }, "MITRE ATT&CK: ");
+          attack.forEach(function (a, i) {
+            if (i) al.append(", ");
+            al.append(h("a", { href: a.url, target: "_blank", rel: "noopener noreferrer", text: a.id + " " + a.name }));
+          });
+        }
+        more = h("details", { class: "f-more" }, h("summary", { text: "Why this matters" }),
+          f.description ? h("p", { text: f.description }) : null,
+          f.remediation ? h("p", {}, h("b", { text: "What to do: " }), f.remediation) : null, al);
+      }
       return h("li", { class: "finding " + f.severity }, h("span", { class: "dot", "aria-hidden": "true" }),
-        h("div", {}, h("div", { class: "t" }, f.title, h("span", { class: "sev", text: SEV_LABEL[f.severity] })),
-          f.detail ? h("div", { class: "d", text: f.detail }) : null));
+        h("div", {}, h("div", { class: "t" }, f.title, h("span", { class: "sev", text: SEV_LABEL[f.severity] }),
+            f.rule_id ? h("span", { class: "rule-id", text: f.rule_id }) : null),
+          f.detail ? h("div", { class: "d", text: f.detail }) : null, more));
     }
     var c = r.stats.findings, risky = (c.critical || 0) + (c.high || 0) + (c.medium || 0);
     var note = risky ? risky + " issue" + (risky > 1 ? "s" : "") + " need attention." : "Nothing that needs attention.";
@@ -390,10 +405,33 @@
         if (a.double_extension) why.push("double extension");
         if (a.content_mismatch) why.push("content is " + a.content_mismatch);
         if (a.kind) why.push(a.kind);
-        al.append(h("li", { class: a.risky ? "risky" : "" }, h("span", { class: "att-name", text: a.filename }),
-          h("span", { class: "att-meta", text: [a.content_type, fmtSize(a.size)].concat(why).join(", ") })));
+        var c = a.container, inner = null;
+        if (a.smuggling && a.smuggling.length) why.push("HTML smuggling: " + a.smuggling.join(", "));
+        if (c) {
+          var risky = {};
+          (c.risky || []).forEach(function (x) { risky[x.name] = true; });
+          var head = c.format + (c.encrypted ? ", password-protected" : "") + ", " +
+            (c.listing === "complete" ? c.entry_count + " file" + (c.entry_count === 1 ? "" : "s") :
+             c.listing === "not listed" ? "contents not listed" : c.entry_count + " name" + (c.entry_count === 1 ? "" : "s") + " found in raw data");
+          inner = h("div", { class: "att-inner" }, h("span", { class: "att-inner-head", text: head }),
+            c.entries.length ? h("ul", {}, c.entries.slice(0, 30).map(function (n) {
+              return h("li", { class: risky[n] ? "risky" : "", text: n });
+            }), c.entries.length > 30 ? h("li", { class: "more", text: "and " + (c.entry_count - 30) + " more" }) : null) : null);
+        }
+        var bad = a.risky || (c && (c.encrypted || (c.risky && c.risky.length))) || (a.smuggling && a.smuggling.length);
+        al.append(h("li", { class: bad ? "risky" : "" }, h("span", { class: "att-name", text: a.filename }),
+          h("span", { class: "att-meta", text: [a.content_type, fmtSize(a.size)].concat(why).join(", ") }), inner));
       });
       parts.push(h("h3", { class: "sub-title", text: "Attachments" }), al);
+    }
+    if (c.calendar && c.calendar.length) {
+      var cl = h("ul", { class: "att-list" });
+      c.calendar.forEach(function (ev) {
+        cl.append(h("li", {}, h("span", { class: "att-name", text: ev.summary || "(untitled event)" }),
+          h("span", { class: "att-meta", text: ["Organiser: " + (ev.organizer || "not given"), ev.method ? "method " + ev.method : "",
+            ev.links.length + " link" + (ev.links.length === 1 ? "" : "s") + " (listed below)"].filter(Boolean).join(", ") })));
+      });
+      parts.push(h("h3", { class: "sub-title", text: "Calendar invites" }), cl);
     }
     if (c.links.length) {
       var lt = h("tbody");
@@ -453,8 +491,61 @@
       h("table", { class: "hdr-table" }, tbody), empty);
   }
 
+  /* Report sections as an accessible tab set (WAI-ARIA tabs pattern). */
+  var tabSeq = 0;
+  function tabs(defs) {
+    var list = h("div", { class: "tablist", role: "tablist", "aria-label": "Report sections" });
+    var wrap = h("div", { class: "tabs" }, list), buttons = [];
+    tabSeq++;
+    defs.forEach(function (d, i) {
+      var tid = "tab-" + tabSeq + "-" + d.id, pid = "panel-" + tabSeq + "-" + d.id;
+      var b = h("button", { type: "button", class: "tab", role: "tab", id: tid, "aria-controls": pid,
+        "aria-selected": i === 0 ? "true" : "false", tabindex: i === 0 ? "0" : "-1" },
+        d.label, d.count != null ? h("span", { class: "n" + (d.alert ? " alert" : ""), text: String(d.count) }) : null);
+      // Section headings duplicate the tab labels, so panels are labelled by their tab instead.
+      var t = d.el.querySelector(".section-title");
+      if (t) t.remove();
+      d.el.classList.remove("block");
+      var panel = h("div", { class: "tabpanel", role: "tabpanel", id: pid, "aria-labelledby": tid, tabindex: "0", hidden: i !== 0 }, d.el);
+      b.addEventListener("click", function () { select(i, false); });
+      buttons.push({ b: b, panel: panel });
+      list.append(b);
+      wrap.append(panel);
+    });
+    function select(i, focus) {
+      buttons.forEach(function (x, j) {
+        x.b.setAttribute("aria-selected", j === i ? "true" : "false");
+        x.b.tabIndex = j === i ? 0 : -1;
+        x.panel.hidden = j !== i;
+      });
+      if (focus) buttons[i].b.focus();
+    }
+    list.addEventListener("keydown", function (e) {
+      var cur = buttons.findIndex(function (x) { return x.b === document.activeElement; }), n = buttons.length, next = null;
+      if (cur < 0) return;
+      if (e.key === "ArrowRight") next = (cur + 1) % n;
+      else if (e.key === "ArrowLeft") next = (cur - 1 + n) % n;
+      else if (e.key === "Home") next = 0;
+      else if (e.key === "End") next = n - 1;
+      if (next != null) { e.preventDefault(); select(next, true); }
+    });
+    return wrap;
+  }
+
   function render(r) {
-    report.replaceChildren(verdict(r), h("div", { class: "cols" }, findings(r), route(r)), authDetails(r), contentSection(r) || "", headersTable(r));
+    var c = r.stats.findings, risky = (c.critical || 0) + (c.high || 0) + (c.medium || 0);
+    var defs = [
+      { id: "findings", label: "Findings", count: risky, alert: (c.critical || 0) + (c.high || 0) > 0, el: findings(r) },
+      { id: "route", label: "Route", count: r.hops.length, el: route(r) },
+      { id: "auth", label: "Authentication", el: authDetails(r) },
+    ];
+    var content = contentSection(r);
+    if (content) {
+      defs.push({ id: "content", label: "Links & attachments",
+        count: r.content.link_count + r.content.attachments.length, el: content });
+    }
+    defs.push({ id: "headers", label: "All headers", count: r.stats.header_count, el: headersTable(r) });
+    report.replaceChildren(verdict(r), tabs(defs));
     intake.hidden = true; report.hidden = false;
     [btnNew, btnExport, btnCopy].forEach(function (b) { b.hidden = false; });
     window.scrollTo(0, 0);

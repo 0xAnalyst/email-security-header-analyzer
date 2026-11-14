@@ -4,7 +4,13 @@
 "use strict";
 const path = require("path"), fs = require("fs");
 const site = path.resolve(process.argv[2] || "site"), samples = path.resolve(process.argv[3] || "tests/samples");
-const expected = { "legit_github.eml": "low", "phish_paypal.eml": "high", "o365_spoof.eml": "high", "esp_spoof_payload.eml": "high" };
+const expected = {
+  "legit_github.eml": "low", "phish_paypal.eml": "high", "o365_spoof.eml": "high", "esp_spoof_payload.eml": "high",
+  "html_smuggling.eml": "high", "archive_payloads.eml": "high", "iso_lnk.eml": "high", "quishing.eml": "high",
+  "thread_hijack.eml": "high", "calendar_phish.eml": "medium",
+};
+// Every message in the false-positive corpus must stay low risk in the browser too.
+for (const f of fs.readdirSync(path.join(samples, "fp"))) if (f.endsWith(".eml")) expected["fp/" + f] = "low";
 const { loadPyodide } = require(path.join(site, "static/pyodide/pyodide.js"));
 
 (async () => {

@@ -196,6 +196,32 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .finding.critical .sev, .finding.high .sev { color: var(--red); }
 .finding .d { color: var(--ink-2); font-size: 15px; overflow-wrap: anywhere; }
 .findings-more { margin-top: 6px; }
+.finding .rule-id { font: 400 12px/1 var(--mono); color: var(--ink-3); margin-left: 8px; white-space: nowrap; }
+.f-more { margin-top: 4px; font-size: 14.5px; color: var(--ink-2); }
+.f-more summary { cursor: pointer; color: var(--blue); width: fit-content; }
+.f-more p { margin: 6px 0 0; max-width: 62rem; }
+.f-attack a { overflow-wrap: anywhere; }
+
+/* ---------- report tabs ---------- */
+.tabs { margin-top: 30px; }
+/* Tabs wrap rather than scroll, so no section is ever hidden off-screen. */
+.tablist { display: flex; flex-wrap: wrap; column-gap: 2px; border-bottom: 1px solid var(--rule-strong); }
+.tab {
+  font: 600 15px/1 var(--sans); color: var(--ink-2); background: none; border: 0; cursor: pointer;
+  padding: 13px 14px 11px; border-bottom: 3px solid transparent; margin-bottom: -1px;
+  display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; flex: none;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.tab .n { font-size: 12.5px; font-weight: 600; line-height: 1; padding: 4px 7px 3px; border-radius: 10px; background: var(--rule); color: var(--ink-2); }
+.tab .n.alert { background: var(--red-soft); color: var(--red); }
+.tab:focus-visible { outline-offset: -2px; }
+.tabpanel { padding-top: 22px; }
+.tabpanel:focus-visible { outline-offset: 6px; }
+.tabpanel .findings { max-width: 64rem; }
+@media (max-width: 560px) {
+  .tab { padding: 11px 10px 9px; font-size: 14.5px; }
+}
 
 /* route */
 .route { list-style: none; margin: 0; padding: 0; position: relative; }
@@ -281,6 +307,14 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .att-list li.risky { border-left-color: var(--red); }
 .att-name { font-family: var(--mono); font-weight: 600; font-size: 14px; display: block; overflow-wrap: anywhere; }
 .att-list li.risky .att-name { color: var(--red); }
+.att-inner { margin-top: 6px; font-size: 14px; color: var(--ink-2); }
+.att-inner-head { display: block; font-weight: 600; }
+.att-inner ul { list-style: none; margin: 4px 0 0; padding: 0 0 0 12px; border-left: 1px dashed var(--rule-strong); }
+.att-list .att-inner li { font-family: var(--mono); font-size: 13px; overflow-wrap: anywhere;
+  border: 0; padding: 1px 0; margin: 0; }
+.att-list .att-inner li.risky { color: var(--red); font-weight: 600; }
+.att-inner li.risky::after { content: "  risky"; font-family: var(--sans); font-weight: 400; font-size: 12px; }
+.att-inner li.more { font-family: var(--sans); color: var(--ink-3); }
 .att-meta { font-size: 13.5px; color: var(--ink-2); }
 .link-table td:first-child { width: 26%; }
 .link-table td:nth-child(2) { width: 42%; }
@@ -328,6 +362,9 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
   .topnav .icon-btn { width: 34px; height: 34px; flex: none; }
 }
 @media print {
+  .tablist { display: none; }
+  .tabpanel[hidden] { display: block !important; }
+  .tabpanel { padding-top: 16px; }
   .topbar, .intake, .foot, .hdr-tools, .hop-raw { display: none !important; }
   body { background: #fff; }
 }

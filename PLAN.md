@@ -33,6 +33,19 @@ of the UI in light, dark and mobile widths, and a README update.
 
 ## Phase 1: Detection engine and quality
 
+**Status: done (November 2026).** 124 tests; every new rule has a sample; the 10-message false-positive corpus
+scores low natively and in the browser build. What changed from the plan:
+- Thread hijacking from a look-alike of a participant's domain is **critical**, not high. The attacker's
+  own domain passes DMARC, so a high rating left these messages at "suspicious".
+- The corpus found two false positives, now fixed: `googlegroups.com` was flagged as a Google
+  look-alike, and mailing-list Reply-To, Sender and footer-broken DKIM were warnings. List allowances
+  apply only when DMARC passes, so a forged `List-Id` can't exploit them.
+- The receiving Microsoft 365 or Gmail server isn't treated as the sending ESP. Only the origin server,
+  DKIM, envelope and Message-ID count as evidence.
+- The report UI is tabbed: Findings, Route, Authentication, Links & attachments and All headers.
+- Not done: QR decoding (declined), RAR and 7z full listings (would need native tools), and VHD
+  partition parsing (VHDs get a bounded file-name scan instead).
+
 ### 1.1 Rule registry (`esha/rules.py`)
 - A `Rule` dataclass with these fields: `id` (ESHA-NNN), `key` (the existing slug, kept for
   compatibility), `title`, `severity` (the default), `category`, `description`, `remediation`,
@@ -130,8 +143,6 @@ section adds archive and disk-image listings and invite details. All content is 
   PyPI wheel on `v*` tags (trusted publishing). Also adds CHANGELOG.md and SECURITY.md.
 
 ## Decisions I need from you
-1. Phase 1: add `zxing-cpp` + Pillow as an optional `[qr]` extra for QR decoding? It would work for
-   the local server and Docker only. Pyodide can't load it, so the Pages site would still flag quishing
-   without decoding.
+1. ~~Phase 1: QR decoding with `zxing-cpp`~~: declined. ESHA flags quishing without decoding the codes.
 2. Phase 2: add `extract-msg` as an optional `[msg]` extra?
 3. Phase 3: add `dnspython` as an optional `[enrich]` extra?

@@ -12,12 +12,18 @@ Built for SOC analysts, incident responders and IT admins who triage suspicious 
 - A **domain alignment table** comparing the From domain against the SPF envelope sender, each DKIM signer, Return-Path, Reply-To, Sender, Message-ID and the sending server's HELO name, using organisational domains from the Public Suffix List
 - SPF or DKIM that passes for an unrelated domain while DMARC fails (the classic spoofing pattern via bulk mail services)
 - Weak `p=none` DMARC policies, conflicting SPF results, and fake `Authentication-Results` headers inserted by the sender
+- DKIM signatures that don't cover From, that use the `l=` body-length tag, or that sign too few headers
+- BIMI logos, including BIMI headers inserted on mail that fails DMARC
+- Mail sent through email service providers (SendGrid, Mailchimp, Amazon SES, Mailgun, Salesforce Marketing Cloud, Postmark, SparkPost, Brevo, HubSpot, Microsoft 365, Google Workspace), so expected envelope and DKIM mismatches are explained instead of flagged. When DMARC fails, ESHA explains why an SPF or DKIM pass for the service's domain proves nothing.
+- Mailing-list messages: list Reply-To, Sender and footer-broken DKIM are notes, not warnings, when DMARC passes
 
 **Sender identity**
 - Look-alike domains imitating major brands: typos (`paypa1`), homoglyphs and Cyrillic/Greek confusables (`раураl`), punycode, brand names embedded in other domains
 - Cousin domains of the sender's own organisation in Reply-To or links (`acmecorp-hr.com` vs `acme-corp.com`), typical of invoice and payroll fraud
 - Display names that contain a different email address, or claim a brand the domain doesn't belong to
 - Reply-To, Return-Path and Sender mismatches, missing Message-ID or Date, forged dates
+- Thread tricks: "RE:" subjects with no thread behind them, and replies from a look-alike of a domain in the conversation (thread hijacking)
+- Bulk mail without List-Unsubscribe, or without one-click unsubscribe (RFC 8058)
 
 **Route**
 - Every relay hop: HELO, reverse DNS, IPv4/IPv6, protocol, TLS, timestamp and per-hop delay
@@ -28,11 +34,16 @@ Built for SOC analysts, incident responders and IT admins who triage suspicious 
 **Content** (when the body is included)
 - Links whose visible text points somewhere else, raw-IP links, URL shorteners, punycode and look-alike link domains, free hosting often used for phishing, open redirects, `javascript:` and `data:` links
 - Risky attachments (HTML, SVG, ISO/IMG, LNK, scripts, executables, macro documents, OneNote), double extensions (`invoice.pdf.html`), and files whose content doesn't match their name
+- HTML smuggling: HTML or SVG attachments that build a file in the browser (`atob`, `Blob`, `msSaveOrOpenBlob`, large base64 data)
+- Inside archives and disk images: password-protected and nested archives, and shortcuts, scripts or programs in ZIP files and ISO/IMG images. RAR, VHD and UDF images are checked for file names in their raw data. Only listings are read; nothing is extracted.
+- Calendar invites (`.ics`) from organisers outside the sender's domain, with their links added to the link table
+- Image-only messages and requests to scan a QR code (quishing). ESHA does not decode QR codes.
+- Remote images and tracking pixels (shown as a note)
 - Login and data-collection forms in the message or its attachments
 
 **Spam filters**: Microsoft 365 (SCL, BCL, SFV, CAT such as `SPOOF` or `PHSH`) and SpamAssassin verdicts.
 
-Every result is combined into a 0–100 risk score with a plain-language explanation for each finding. The score is heuristic: treat it as triage, not proof.
+Every result is combined into a 0–100 risk score. Each finding has a plain-language explanation, advice on what to do and its MITRE ATT&CK techniques. The report is split into tabs: Findings, Route, Authentication, Links & attachments (when the message body is included) and All headers. The score is heuristic: treat it as triage, not proof.
 
 ## Use it in your browser
 
@@ -142,7 +153,7 @@ The databases are saved to `esha/static/data`. To keep them elsewhere, use `--de
 
 ```sh
 pip install -r requirements-dev.txt
-pytest            # 42 tests, including real-world style samples in tests/samples
+pytest            # 124 tests, including attack samples and a false-positive corpus in tests/samples
 ruff check esha tests
 ```
 
@@ -153,12 +164,17 @@ Project layout:
 | `esha/core/received.py` | Received-header parsing, IP extraction, hop timing |
 | `esha/core/auth.py` | Authentication-Results, ARC, DKIM-Signature, Received-SPF, spam-filter parsing |
 | `esha/core/domains.py` | Organisational domains, look-alike and cousin-domain detection |
-| `esha/core/body.py` | Link, attachment and form inspection |
+| `esha/core/body.py` | Link, attachment, form, image and calendar inspection |
+| `esha/core/attachments.py` | Archive and disk-image listings, HTML smuggling, `.ics` parsing |
+| `esha/core/esp.py` | Email service provider recognition |
+| `esha/core/rules.py` | Detection rule registry (IDs, ATT&CK, advice) |
+| `esha/core/scoring.py` | Score weights and thresholds (`esha.json`, `ESHA_WEIGHTS`) |
 | `esha/core/analyzer.py` | Findings, alignment and scoring |
 | `esha/app.py` | Flask web app and JSON API |
 | `esha/__main__.py` | Command line |
 | `esha/static/js/worker.js` | In-browser engine (Pyodide) used by the static site |
 | `scripts/build_site.py` | Builds the GitHub Pages site into `./site` |
+| `scripts/make_samples.py` | Regenerates the synthetic samples and false-positive corpus |
 
 ## Credits and license
 
