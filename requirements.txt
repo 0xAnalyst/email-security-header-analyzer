@@ -1,6 +1,5 @@
-flask
-pygal
-IPy
-geoip2
-python-dateutil
-gunicorn
+Flask>=3.0,<4
+geoip2>=4.8,<6
+python-dateutil>=2.9
+publicsuffixlist>=1.0
+gunicorn>=22.0; platform_system != "Windows"

@@ -1,210 +1,82 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
 <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
-    <meta name="description" content="">
-    <meta name="author" content="">
-    <link rel="icon" href="{{url_for('static', filename='imgs/fav.png')}}">
-    <title>Mail Header Analyzer (MHA)</title>
-    <!-- Bootstrap core CSS -->
-    <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
-    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
-    <link href="{{url_for('static', filename='css/ie10-viewport-bug-workaround.css')}}" rel="stylesheet">
-    <!-- Custom styles for this template -->
-    <link href="{{url_for('static', filename='css/starter-template.css')}}" rel="stylesheet">
-    <!-- Just for debugging purposes. Don't actually copy these 2 lines! -->
-    <!--[if lt IE 9]><script src="../../assets/js/ie8-responsive-file-warning.js"></script><![endif]-->
-    <script src="{{url_for('static', filename='js/ie-emulation-modes-warning.js')}}"></script>
-    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
-    <!--[if lt IE 9]>
-      <script src="{{url_for('static', filename='js/html5shiv.min.js')}}"></script>
-      <script src="{{url_for('static', filename='js/respond.min.js')}}"></script>
-    <![endif]-->
-    <link href="{{url_for('static', filename='css/bootstrap-table.min.css')}}" rel="stylesheet">
-    <link href="{{url_for('static', filename='css/flag-sprites.min.css')}}" rel="stylesheet" type="text/css" />
-    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.13.0/css/all.css" integrity="sha384-Bfad6CLCknfcloXFOyFnlgtENryhrpZCe29RTifKEixXQZ38WheV+i/6YWSzkz3V" crossorigin="anonymous">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Email Header Analyzer (MHA)</title>
+  <meta name="description" content="Trace an email's route, check SPF, DKIM and DMARC, and spot phishing signs from its headers.">
+  <link rel="icon" href="{{ url_for('static', filename='imgs/fav.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ version }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/flags.css') }}">
+  <script src="{{ url_for('static', filename='js/theme.js') }}?v={{ version }}"></script>
 </head>
-
 <body>
-    <!-- Fixed navbar -->
-    <nav class="navbar navbar-inverse navbar-fixed-top">
-        <div class="container-fluid">
-            <div class="navbar-header">
-                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar"
-                    aria-expanded="false" aria-controls="navbar">
-                    <span class="sr-only">Toggle navigation</span>
-                    <span class="icon-bar"></span>
-                    <span class="icon-bar"></span>
-                    <span class="icon-bar"></span>
-                </button>
-                <a class="navbar-brand" href="/">Mail Header Analyzer <small>(MHA)</small></a>
-            </div>
-            <div id="navbar" class="collapse navbar-collapse">
-                <ul class="nav navbar-nav">
-                    <li class="active"><a href="/">Home</a></li>
-                    {#
-                    <li><a href="#about">About</a></li> #} {#
-                    <li><a href="#contact">Contact</a></li> #}
-                </ul>
-                <ul class="nav navbar-nav navbar-right icons">
-                    <li><a href="https://github.com/lnxg33k/MHA" target="_blank"><i class="fab fa-github"></i></a></li>
-                    <li><a href="https://twitter.com/lnxg33k" target="_blank"><i class="fab fa-twitter"></i></a></li>
-                </ul>
-            </div>
-            <!--/.nav-collapse -->
-        </div>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="MHA home">
+      <svg class="brand-mark" viewBox="0 0 40 28" aria-hidden="true"><rect x="1.5" y="1.5" width="37" height="25" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M2 3l18 13L38 3" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path class="brand-stripe" d="M1.5 23h37" stroke-width="3" stroke-dasharray="5 4"/></svg>
+      <span class="brand-name">MHA</span>
+      <span class="brand-sub">Email Header Analyzer</span>
+    </a>
+    <nav class="topnav" aria-label="Actions">
+      <button type="button" class="btn ghost" id="btn-new" hidden>New analysis</button>
+      <button type="button" class="btn ghost" id="btn-copy" hidden>Copy summary</button>
+      <button type="button" class="btn ghost" id="btn-export" hidden>Export JSON</button>
+      <button type="button" class="icon-btn" id="btn-theme" aria-label="Switch colour theme" title="Switch colour theme">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z" fill="currentColor"/></svg>
+      </button>
     </nav>
-    <!-- Begin page content -->
-    <div class="container-fluid" style="padding-top: 50px;">
-        {% if data %}
-        <div class="well well-lg">
-            <div class="row" style="padding-top: 15px;">
-                <div class="col-md-6">
-                    <dl class="dl-horizontal">
-                        <dt>Subject</dt>
-                        <dd>{{ summary.Subject }}</dd>
-                        <dt>Message-ID</dt>
-                        <dd>{{ summary.MessageID }}</dd>
-                        <dt>Creation time (Date)</dt>
-                        <dd>{{ summary.Date }}</dd>
-                        <dt>From</dt>
-                        <dd>{{ summary.From }}</dd>
-                        <dt>To</dt>
-                        <dd>{{ summary.To }}</dd>
-                        {% if summary.Cc %}
-                        <dt>Cc</dt>
-                        <dd>{{ summary.Cc }}</dd>
-                        {% endif %}
-                    </dl>
-                </div>
-                {% if delayed %}
-                <div class="col-md-6">
-                    {# <div id="chart_div"></div>#}
-                    {{ chart|safe }}
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        <table id="table" data-toggle="table" data-search="true" data-show-columns="true" data-striped="true"
-            data-show-toggle="true" data-show-refresh="true" data-page-size="13" data-sort-name="hop"
-            data-sort-order="asc">
-            <thead style="background-color: #333333;color:#d4d4d4;">
-                <tr>
-                    <th data-field="hop" data-sortable="true">Hop</th>
-                    <th data-sortable="true">From</th>
-                    <th data-sortable="true">By</th>
-                    <th data-sortable="true">With</th>
-                    <th data-sortable="true">Time (UTC)</th>
-                    <th data-sortable="true">Delay</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for k, v in data.items() %}
-                <tr>
-                    <td>{{ k }}</td>
-                    <td>{{ v.Direction.0 }}{% if country(v.Direction.0).iso_code %}<span class="pull-right"><a href="#"
-                                data-toggle="tooltip" data-placement="top"
-                                title="{{country(v.Direction.0).country_name}}"><i
-                                    class="flag flag-{{country(v.Direction.0).iso_code}}"></i></a></span>{% endif %}
-                    </td>
-                    <td>{{ v.Direction.1 }}{% if country(v.Direction.1).iso_code %}<span class="pull-right"><a href="#"
-                                data-toggle="tooltip" data-placement="top"
-                                title="{{country(v.Direction.1).country_name}}"><i
-                                    class="flag flag-{{country(v.Direction.1).iso_code}}"></i></a></span>{% endif %}
-                    </td>
-                    <td>{{ v.Direction.2 }}</td>
-                    <td>{{ v.Time }}</td>
-                    <td>
-                        {% if duration(v.Delay) %} {{ duration(v.Delay) }} {% else %} {% if loop.first %} *
-                        {% else %}0{% endif %} {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <div class="panel panel-default" style="margin-top: 10px;">
-            <!-- Default panel contents -->
-            <div class="panel-heading">
-                <h3 class="panel-title">Security Headers</h3>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-bordered">
-                    {% for k,v in n.items() %}
-                    {% if k in security_headers %}
-                    <tr>
-                        <th>{{ k }}</th>
-                        <td>{{ v }}</td>
-                    </tr>
-                    {% endif %} {% endfor %}
-                </table>
-            </div>
-        </div>
-        <div class="panel panel-default" style="margin-top: 10px;">
-            <!-- Default panel contents -->
-            <div class="panel-heading">
-                <h3 class="panel-title">X- headers</h3>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-bordered">
-                    {% for k,v in n.items() %}
-                    {% if k.startswith('X-') %}
-                    <tr>
-                        <th>{{ k }}</th>
-                        <td>{{ v }}</td>
-                    </tr>
-                    {% endif %} {% endfor %}
-                </table>
-            </div>
-        </div>
-        <div class="panel panel-default" style="margin-top: 10px;">
-            <!-- Default panel contents -->
-            <div class="panel-heading">
-                <h3 class="panel-title">Other headers</h3>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-bordered">
-                    {% for k,v in n.items() %}
-                    {% if k not in ['Received','Subject','From','To','Message-ID','CC','Date'] and k not in security_headers and not k.startswith('X-') %}
-                    <tr>
-                        <th>{{ k }}</th>
-                        <td>{{ v }}</td>
-                    </tr>
-                    {% endif %} {% endfor %}
-                </table>
-            </div>
-        </div>
-        {% else %}
-        <div class="row">
-            <div class="col-md-12">
-                <form method="POST">
-                    <div class="form-group">
-                        <textarea name='headers' class="form-control" rows="25" placeholder="Paste the header in here."
-                            autofocus required></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-lg btn-block">Analyze This !</button>
-                </form>
-            </div>
-        </div>
-        {% endif %}
-    </div>
-    <!-- Bootstrap core JavaScript
-    ================================================== -->
-    <!-- Placed at the end of the document so the pages load faster -->
-    <script src="{{url_for('static', filename='js/jquery.min.js')}}"></script>
-    <script src="{{url_for('static', filename='js/bootstrap.min.js')}}"></script>
-    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
-    <script src="{{url_for('static', filename='js/ie10-viewport-bug-workaround.js')}}"></script>
-    <script src="{{url_for('static', filename='js/bootstrap-table.min.js')}}"></script>
-    <script src="{{url_for('static', filename='js/pygal-tooltips.min.js')}}"></script>
-    <script type="text/javascript">
-        $(document).ready(function () {
-            $('[data-toggle="tooltip"]').tooltip();
-        });
-    </script>
-</body>
+  </header>
 
+  <main id="main">
+    <section id="intake" class="intake" aria-labelledby="intake-title">
+      <div class="intake-copy">
+        <h1 id="intake-title">Where did this email really come from?</h1>
+        <p class="lede">Paste the message headers or drop an <code>.eml</code> file. You get the relay route, SPF, DKIM and DMARC results with every domain mismatch, and the signs of spoofing or phishing in the links and attachments, in one report.</p>
+      </div>
+      <form id="form" class="intake-form" novalidate>
+        <label for="headers" class="field-label">Message headers</label>
+        <div class="drop" id="drop">
+          <textarea id="headers" name="headers" spellcheck="false" autocomplete="off"
+            placeholder="Received: from mail.example.com (mail.example.com [203.0.113.5])&#10;        by mx.example.net with ESMTPS id 4F2A...&#10;Authentication-Results: mx.example.net; spf=pass ...&#10;From: Alice &lt;alice@example.com&gt;&#10;Subject: ...">{{ prefill or '' }}</textarea>
+          <div class="drop-hint" aria-hidden="true">Drop the .eml file to analyze it</div>
+        </div>
+        <div class="intake-actions">
+          <button type="submit" class="btn primary" id="btn-analyze">Analyze headers</button>
+          <label class="btn ghost file-btn">
+            <input type="file" id="file" accept=".eml,.txt,.mbox,message/rfc822,text/plain">
+            Open .eml file
+          </label>
+          <span class="samples">Try a sample:
+            <button type="button" class="link" data-sample="legit_github.eml">legitimate</button>,
+            <button type="button" class="link" data-sample="phish_paypal.eml">look-alike phishing</button>,
+            <button type="button" class="link" data-sample="o365_spoof.eml">Microsoft 365 spoof</button>,
+            <button type="button" class="link" data-sample="esp_spoof_payload.eml">payroll scam with attachment</button>
+          </span>
+        </div>
+        <p class="error" id="error" role="alert" hidden></p>
+      </form>
+      <aside class="howto">
+        <h2>Finding the headers</h2>
+        <dl>
+          <dt>Gmail</dt><dd>Open the message, choose <em>More</em>, then <em>Show original</em>.</dd>
+          <dt>Outlook</dt><dd>Open the message, choose <em>…</em> then <em>View</em>, then <em>View message source</em> (or <em>File › Properties</em> on desktop).</dd>
+          <dt>Apple Mail</dt><dd><em>View › Message › All Headers</em>, or drag the message to your desktop to save an .eml.</dd>
+          <dt>Thunderbird</dt><dd><em>More › View Source</em>, or press Ctrl+U.</dd>
+        </dl>
+        <p class="privacy">Headers are analyzed by this server only. Nothing is sent to third-party services, and nothing is stored.</p>
+      </aside>
+    </section>
+
+    <section id="report" class="report" hidden aria-live="polite"></section>
+  </main>
+
+  <footer class="foot">
+    <span>MHA {{ version }}</span>
+    <span>Fork of <a href="https://github.com/cyberdefenders/email-header-analyzer">cyberdefenders/email-header-analyzer</a></span>
+    <span>IP geolocation by MaxMind GeoLite2</span>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}?v={{ version }}"></script>
+</body>
 </html>

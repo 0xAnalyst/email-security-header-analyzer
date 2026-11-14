@@ -1,86 +1,124 @@
-## E-Mail Header Analyzer (MHA)
-![mha](https://cloud.githubusercontent.com/assets/1170490/18221866/b7b362d6-718e-11e6-9fa0-2e7f8bc2b9d7.png)
+# MHA: E-Mail Header Analyzer
 
+Paste an email's headers, or drop the whole `.eml` file, and MHA tells you where the message really came from: whether SPF, DKIM and DMARC passed, which identities don't match the sender, and which signs of phishing or spoofing it shows. Analysis runs entirely on your machine and never contacts third-party services.
 
-## What is E-Mail header analyzer (MHA):
-E-Mail header analyzer is a tool written in [flask](http://flask.pocoo.org/) for parsing email headers and converting them to a human readable format and it also can:
-* Identify hop delays.
-* Identify the source of the email.
-* Identify hop country.
+MHA 2 is a rewrite of [cyberdefenders/email-header-analyzer](https://github.com/cyberdefenders/email-header-analyzer) (originally by [@lnxg33k](https://github.com/lnxg33k)), with a new analysis engine, interface, API and command line.
 
+## What it checks
 
-## MHA is an alternative for the following:
-| Name | Dev | Issues |
-| ---- | --- | ----- |
-| [MessageHeader](https://toolbox.googleapps.com/apps/messageheader/) | Google | Not showing all the hops. |
-| [EmailHeaders](https://mxtoolbox.com/Public/Tools/EmailHeaders.aspx) | Mxtoolbox | Not accurate and slow. |
-| [Message Header Analyzer](https://testconnectivity.microsoft.com/MHA/Pages/mha.aspx) | Microsoft | Broken UI. |
+**Authentication and mismatches**
+- SPF, DKIM, DMARC, ARC and Microsoft composite-auth (`compauth`) verdicts, taken from the receiving server's `Authentication-Results`, or `Received-SPF` and `DKIM-Signature` when that's missing
+- DMARC worked out from SPF and DKIM alignment when no verdict was recorded
+- A **domain alignment table** comparing the From domain against the SPF envelope sender, each DKIM signer, Return-Path, Reply-To, Sender, Message-ID and the sending server's HELO name, using organisational domains from the Public Suffix List
+- SPF or DKIM that passes for an unrelated domain while DMARC fails (the classic spoofing pattern via bulk mail services)
+- Weak `p=none` DMARC policies, conflicting SPF results, and fake `Authentication-Results` headers inserted by the sender
 
+**Sender identity**
+- Look-alike domains imitating major brands: typos (`paypa1`), homoglyphs and Cyrillic/Greek confusables (`раураl`), punycode, brand names embedded in other domains
+- Cousin domains of the sender's own organisation in Reply-To or links (`acmecorp-hr.com` vs `acme-corp.com`), typical of invoice and payroll fraud
+- Display names that contain a different email address, or claim a brand the domain doesn't belong to
+- Reply-To, Return-Path and Sender mismatches, missing Message-ID or Date, forged dates
 
-## Installation
-Install system dependencies:
-```
-sudo apt-get update
-sudo apt-get install python3-pip
-sudo pip3 install virtualenv
-```
-Create a Python3 virtual environment and activate it:
-```
-virtualenv virt
-source virt/bin/activate
-```
-Clone the GitHub repo:
-```
-git clone https://github.com/lnxg33k/email-header-analyzer.git
-```
-Install Python dependencies:
-```
-cd MHA
-pip3 install -r requirements.txt
-```
-Run the development server:
-`python3 server.py -d`
+**Route**
+- Every relay hop: HELO, reverse DNS, IPv4/IPv6, protocol, TLS, timestamp and per-hop delay
+- Correct handling of server clock skew and missing time zones (MHA 1 reported these as 24-hour delays or crashed)
+- Originating IP with country (plus city and network owner if you add the free MaxMind City/ASN databases)
+- Residential or dynamic sending IPs, missing reverse DNS, bare-IP HELO greetings
 
-You can change the bind address or port by specifying the appropriate options:
-`python3 server.py -b 0.0.0.0 -p 8080`
+**Content** (when the body is included)
+- Links whose visible text points somewhere else, raw-IP links, URL shorteners, punycode and look-alike link domains, free hosting often used for phishing, open redirects, `javascript:` and `data:` links
+- Risky attachments (HTML, SVG, ISO/IMG, LNK, scripts, executables, macro documents, OneNote), double extensions (`invoice.pdf.html`), and files whose content doesn't match their name
+- Login and data-collection forms in the message or its attachments
 
-Everything should go well, now visit [http://localhost:8080](http://localhost:8080).
+**Spam filters**: Microsoft 365 (SCL, BCL, SFV, CAT such as `SPOOF` or `PHSH`) and SpamAssassin verdicts.
 
-## Docker
+Every result is combined into a 0–100 risk score with a plain-language explanation for each finding. The score is heuristic: treat it as triage, not proof.
 
-A `Dockerfile` is provided if you wish to build a docker image.
+## Run it
 
-```
-docker build -t mha:latest .
+You need Python 3.9 or newer.
+
+**macOS / Linux**
+```sh
+./run.sh
 ```
 
-You can then run a container with:
+**Windows**: double-click `run.bat`.
 
-```
-docker run -d -p 8080:8080 mha:latest
-```
+The script creates a virtual environment, installs dependencies and opens http://127.0.0.1:8080 in your browser. Press Ctrl+C to stop.
 
-### Docker-Compose
-
-A `docker-compose` file is provided if you wish to use docker-compose.
-
-Clone the GitHub repo:
-```
-git clone https://github.com/lnxg33k/email-header-analyzer.git
-cd email-header-analyzer
+**Manually**
+```sh
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python -m mha --open          # options: -b 0.0.0.0 -p 9000
 ```
 
-Let docker-compose do the work.
+**Docker**
+```sh
+docker compose up -d          # http://127.0.0.1:8080
 ```
-docker-compose up -d
+The image runs gunicorn as a non-root user with a read-only filesystem and a health check.
+
+## Command line
+
+```sh
+python -m mha analyze message.eml            # colour report in the terminal
+python -m mha analyze message.eml --json     # full JSON report
+pbpaste | python -m mha analyze -            # headers from the clipboard (macOS)
+```
+`analyze` exits with code 2 when the verdict is high risk, so it can be used in scripts.
+
+## API
+
+```sh
+curl -s localhost:8080/api/analyze -H 'Content-Type: application/json' -d '{"headers": "..."}'
+curl -s localhost:8080/api/analyze -F file=@message.eml
+curl -s localhost:8080/api/analyze -H 'Content-Type: message/rfc822' --data-binary @message.eml
+curl -s localhost:8080/api/health
 ```
 
-Stop the container.
-```
-docker-compose down
+The response contains `score`, `findings` (each with `severity`, `title`, `detail`, `category`), `auth` (including the `alignment` table), `hops`, `origin`, `content` (links and attachments), `spam`, `summary` and the decoded `headers`.
+
+## Keep geolocation current
+
+The bundled GeoLite2 Country database is from 2018, so some locations are out of date. To update it, and to add city and network-owner lookups:
+
+1. Create a free MaxMind account at https://www.maxmind.com/en/geolite2/signup and generate a license key.
+2. Run:
+   ```sh
+   MAXMIND_ACCOUNT_ID=123456 MAXMIND_LICENSE_KEY=xxxx python scripts/update_geoip.py
+   ```
+
+The databases are saved to `mha/static/data`. To keep them elsewhere, use `--dest /path` and set `MHA_GEOIP_DIR=/path`.
+
+## Privacy and security
+
+- No network lookups: no DNS, no WHOIS, and no reputation APIs. Headers and messages are not stored or logged.
+- Links and attachments are inspected as text only. Nothing is opened, fetched or executed.
+- The web UI uses a strict Content Security Policy, no third-party scripts, fonts or CDNs, and renders all message content as text.
+- By default the server listens on `127.0.0.1` only. Put it behind authentication before exposing it on a network.
+
+## Development
+
+```sh
+pip install -r requirements-dev.txt
+pytest            # 39 tests, including real-world style samples in tests/samples
+ruff check mha tests
 ```
 
-HowTo enable debugging. Add in the docker `docker-compose.yml` file the line
-```yaml
-command: --debug
-```
+Project layout:
+
+| Path | Purpose |
+| --- | --- |
+| `mha/core/received.py` | Received-header parsing, IP extraction, hop timing |
+| `mha/core/auth.py` | Authentication-Results, ARC, DKIM-Signature, Received-SPF, spam-filter parsing |
+| `mha/core/domains.py` | Organisational domains, look-alike and cousin-domain detection |
+| `mha/core/body.py` | Link, attachment and form inspection |
+| `mha/core/analyzer.py` | Findings, alignment and scoring |
+| `mha/app.py` | Flask web app and JSON API |
+| `mha/__main__.py` | Command line |
+
+## License
+
+GPL-3.0, the same as the original project. See [LICENSE.md](LICENSE.md). Fonts: Overpass (SIL Open Font License). IP geolocation: MaxMind GeoLite2 (CC BY-SA 4.0).

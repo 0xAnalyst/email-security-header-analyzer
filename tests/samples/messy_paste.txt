@@ -1,0 +1,11 @@
+Microsoft Mail Internet Headers Version 2.0
+
+Received: from relay2.partner.example (2001:db8:1::25) by mail.corp.example (2a00:1450:4864:20::335) with ESMTPS; Fri, 13 Nov 2026 10:00:05
+
+Received: from app01.partner.example ([2a00:1450:4864:20::22f]) by relay2.partner.example with ESMTP id 991; Fri, 13 Nov 2026 10:00:20 +0000
+Received: from localhost (localhost [127.0.0.1]) by app01.partner.example; Fri, 13 Nov 2026 09:58:00 +0000
+From: Partner Billing <billing@partner.example>
+To: me@corp.example
+Subject: Invoice 4471
+Date: garbage date value
+Message-ID: <x1@partner.example>

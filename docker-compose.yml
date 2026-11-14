@@ -1,11 +1,15 @@
-version: "3"
-
 services:
   mha:
-    container_name: mha
     build: .
     image: mha:latest
+    container_name: mha
     restart: unless-stopped
     ports:
-     - "8080:8080"
-    command: --debug
+      - "127.0.0.1:8080:8080"
+    read_only: true
+    tmpfs: [/tmp]
+    # Optional: mount newer GeoLite2 databases (see scripts/update_geoip.py)
+    # environment:
+    #   MHA_GEOIP_DIR: /geoip
+    # volumes:
+    #   - ./geoip:/geoip:ro

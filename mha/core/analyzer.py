@@ -1,0 +1,593 @@
+"""High-level analysis: turn raw headers into a structured, JSON-safe report."""
+from __future__ import annotations
+
+import re
+from datetime import datetime, timezone
+from email.parser import HeaderParser
+
+from . import auth as A
+from . import geo
+from .body import analyze_body
+from .domains import (
+    FREE_MAIL,
+    aligned,
+    brand_in_text,
+    brand_label,
+    cousin_domain,
+    decode_mime,
+    domain_of,
+    is_punycode,
+    lookalike_brand,
+    org_domain,
+    parse_mailbox,
+    parse_mailbox_list,
+)
+from .received import build_hops, find_ips, is_public_ip, parse_date
+
+MAX_INPUT = 2_000_000  # characters
+
+SEVERITY_WEIGHT = {"critical": 40, "high": 25, "medium": 12, "low": 4, "info": 0, "pass": 0}
+
+_KNOWN_HEADER = re.compile(
+    r"^(X-[\w-]+|Received|From|To|Cc|Bcc|Subject|Date|Message-ID|Return-Path|Reply-To|Sender|"
+    r"Authentication-Results|ARC-[\w-]+|DKIM-Signature|Received-SPF|Content-[\w-]+|MIME-Version|"
+    r"Delivered-To|List-[\w-]+|In-Reply-To|References|Thread-[\w-]+|Accept-Language|Importance|"
+    r"Precedence|Feedback-ID|Errors-To|Envelope-To)\s*:", re.IGNORECASE)
+_HEADER_LINE = re.compile(r"^[!-9;-~]+:")
+
+URGENCY = re.compile(
+    r"\b(urgent|immediately|action required|verify|verification|suspend(ed)?|locked|"
+    r"unusual (sign[- ]?in|activity)|password|expire[sd]?|invoice|payment|wire transfer|"
+    r"gift ?card|confirm your|account (update|alert)|security alert|final notice|overdue)\b", re.IGNORECASE)
+
+SUSPICIOUS_MAILERS = re.compile(r"(phpmailer|swiftmailer|the bat!|mass ?mail|bulk ?mail|"
+                                r"atomic ?mail|sendblaster|gammadyne|php/\d)", re.IGNORECASE)
+
+CATEGORY_RULES = [
+    ("routing", re.compile(r"^(received|x-received|return-path|delivered-to|envelope-to|x-original-to|"
+                           r"x-originating-ip|x-sender-ip|x-forwarded-.*)$", re.IGNORECASE)),
+    ("authentication", re.compile(r"^(authentication-results|arc-.*|dkim-signature|x-google-dkim-signature|"
+                                  r"received-spf|x-ms-exchange-.*auth.*|x-original-authentication-results|"
+                                  r"domainkey-signature)$", re.IGNORECASE)),
+    ("spam", re.compile(r"^(x-spam.*|x-forefront-antispam-report.*|x-microsoft-antispam.*|"
+                        r"x-ms-exchange-organization-scl|x-mimecast-spam.*|x-proofpoint-.*|"
+                        r"x-barracuda-.*|x-ironport-.*|x-rspamd.*|x-virus.*)$", re.IGNORECASE)),
+    ("message", re.compile(r"^(from|to|cc|bcc|subject|date|message-id|reply-to|sender|in-reply-to|"
+                           r"references|mime-version|content-.*|thread-.*|importance|priority|"
+                           r"x-priority|list-.*|precedence|x-mailer|user-agent)$", re.IGNORECASE)),
+]
+
+
+def _category(name: str) -> str:
+    for cat, rx in CATEGORY_RULES:
+        if rx.match(name):
+            return cat
+    return "x-header" if name.lower().startswith("x-") else "other"
+
+
+def normalize(text: str, from_file: bool = False) -> str:
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    if len(text) > MAX_INPUT:
+        text = text[:MAX_INPUT]
+    lines = text.split("\n")
+    # Drop preamble lines (e.g. "Microsoft Mail Internet Headers Version 2.0")
+    while lines and not _HEADER_LINE.match(lines[0]):
+        lines.pop(0)
+    if from_file:
+        return "\n".join(lines)
+    # In pasted text, tolerate blank lines between headers.
+    out, i = [], 0
+    while i < len(lines):
+        line = lines[i]
+        if not line.strip():
+            j = i
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            if j < len(lines) and _KNOWN_HEADER.match(lines[j]):
+                i = j
+                continue
+            out.extend(lines[i:])
+            break
+        # Some UIs strip folding whitespace; re-indent obvious continuation lines.
+        if out and not _HEADER_LINE.match(line) and not line[:1].isspace():
+            line = " " + line
+        out.append(line)
+        i += 1
+    return "\n".join(out)
+
+
+def _finding(severity, title, detail="", category="general", id_=None):
+    return {"id": id_ or re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-"),
+            "severity": severity, "title": title, "detail": detail, "category": category}
+
+
+def analyze(text: str, from_file: bool = False) -> dict:
+    raw = normalize(text or "", from_file=from_file)
+    msg = HeaderParser().parsestr(raw, headersonly=True)
+    items = [(k, v) for k, v in msg.items()]
+    hmap: dict[str, list[str]] = {}
+    for k, v in items:
+        hmap.setdefault(k.lower(), []).append(v)
+
+    def first(name):
+        vals = hmap.get(name.lower())
+        return vals[0] if vals else None
+
+    # ---------------------------------------------------------------- summary
+    from_mb = parse_mailbox(first("from"))
+    sender_mb = parse_mailbox(first("sender")) if first("sender") else None
+    reply_to = parse_mailbox_list(first("reply-to"))
+    return_path = parse_mailbox(first("return-path")) if first("return-path") else None
+    date_dt, _ = parse_date(first("date") or "")
+    summary = {
+        "subject": decode_mime(first("subject")),
+        "from": from_mb,
+        "sender": sender_mb,
+        "to": parse_mailbox_list(", ".join(hmap.get("to", []))),
+        "cc": parse_mailbox_list(", ".join(hmap.get("cc", []))),
+        "reply_to": reply_to,
+        "return_path": return_path,
+        "date": first("date"),
+        "date_utc": date_dt.isoformat() if date_dt else None,
+        "message_id": (first("message-id") or "").strip(),
+        "mailer": (first("x-mailer") or first("user-agent") or "").strip(),
+        "originating_ip_header": None,
+    }
+    for name in ("x-originating-ip", "x-sender-ip", "x-source-ip"):
+        if first(name):
+            ips = find_ips(first(name))
+            if ips:
+                summary["originating_ip_header"] = {"header": name, "ip": ips[0], "geo": geo.lookup(ips[0])}
+                break
+
+    # ------------------------------------------------------------------- hops
+    hops = build_hops(hmap.get("received", []))
+    for h in hops:
+        h.geo = geo.lookup(h.from_ip)
+    hop_dicts = [h.to_dict() for h in hops]
+    timed = [h for h in hops if h.timestamp]
+    total = (timed[-1].timestamp - timed[0].timestamp).total_seconds() if len(timed) > 1 else 0
+    origin = None
+    for h in hops:
+        if h.from_ip and is_public_ip(h.from_ip):
+            origin = {"hop": h.index, "ip": h.from_ip, "host": h.from_host,
+                      "detail": h.from_detail, "geo": h.geo}
+            break
+    timing = {
+        "total_seconds": max(total, 0),
+        "first": timed[0].timestamp.isoformat() if timed else None,
+        "last": timed[-1].timestamp.isoformat() if timed else None,
+        "slowest_hop": max(hops, key=lambda h: h.delay or 0).index if any(h.delay for h in hops) else None,
+    }
+
+    # ---------------------------------------------------------- authentication
+    ar_list = [A.parse_authentication_results(v) for v in hmap.get("authentication-results", [])]
+    arc_ar = [A.parse_arc_authentication_results(v) for v in hmap.get("arc-authentication-results", [])]
+    rspf = [A.parse_received_spf(v) for v in hmap.get("received-spf", [])]
+    dkim_sigs = [A.parse_dkim_signature(v) for v in hmap.get("dkim-signature", [])]
+    arc_seals = [A.parse_tag_list(v) for v in hmap.get("arc-seal", [])]
+
+    # The top-most Authentication-Results is the one added by the final
+    # receiving server, and the only one that can usually be trusted.
+    trusted = ar_list[0] if ar_list else None
+    def results_for(method):
+        return [r for r in (trusted["results"] if trusted else []) if r["method"] == method]
+
+    from_domain = from_mb["domain"]
+
+    # SPF
+    spf = {"result": "none", "domain": "", "aligned": False, "source": None, "client_ip": None}
+    s = results_for("spf")
+    if s:
+        r = s[0]
+        spf.update(result=r["result"], source="Authentication-Results",
+                   domain=domain_of(r["props"].get("smtp.mailfrom") or r["props"].get("smtp.helo") or ""))
+    elif rspf:
+        r = rspf[0]
+        spf.update(result=r["result"], source="Received-SPF",
+                   domain=domain_of(r["tags"].get("envelope-from") or r["tags"].get("helo") or ""),
+                   client_ip=r["tags"].get("client-ip"))
+    if not spf["domain"] and return_path:
+        spf["domain"] = return_path["domain"]
+    spf["aligned"] = aligned(spf["domain"], from_domain)
+
+    # DKIM
+    dk = results_for("dkim")
+    dkim_results = []
+    for r in dk:
+        d = (r["props"].get("header.d") or domain_of(r["props"].get("header.i", "")) or "").lower()
+        dkim_results.append({"result": r["result"], "domain": d, "selector": r["props"].get("header.s", ""),
+                             "aligned": aligned(d, from_domain)})
+    if dk:
+        passing = [x for x in dkim_results if x["result"] == "pass"]
+        dkim_result = "pass" if passing else dk[0]["result"]
+        dkim_aligned = any(x["aligned"] for x in passing)
+    elif dkim_sigs:
+        dkim_result, dkim_aligned = "unverified", any(aligned(sg["domain"], from_domain) for sg in dkim_sigs)
+    else:
+        dkim_result, dkim_aligned = "none", False
+    dkim = {"result": dkim_result, "aligned": dkim_aligned, "results": dkim_results, "signatures": dkim_sigs}
+
+    # DMARC
+    dm = results_for("dmarc")
+    if dm:
+        r = dm[0]
+        dmarc = {"result": r["result"], "computed": False,
+                 "policy": r["props"].get("policy.p") or r["props"].get("policy.dmarc"),
+                 "disposition": r["props"].get("policy.dis"),
+                 "header_from": r["props"].get("header.from", from_domain)}
+    else:
+        if (spf["result"] == "pass" and spf["aligned"]) or (dkim_result == "pass" and dkim_aligned):
+            res = "pass"
+        elif spf["result"] in ("none",) and dkim_result in ("none", "unverified"):
+            res = "unknown"
+        else:
+            res = "fail"
+        dmarc = {"result": res, "computed": True, "policy": None, "disposition": None, "header_from": from_domain}
+
+    # ARC
+    arc_res = results_for("arc")
+    cvs = [sl.get("cv", "").lower() for sl in arc_seals]
+    arc = {"result": arc_res[0]["result"] if arc_res else ("present" if arc_seals else "none"),
+           "sets": len(arc_seals), "chain_validation": cvs,
+           "results": arc_ar}
+
+    compauth = results_for("compauth")
+    authn = {
+        "spf": spf, "dkim": dkim, "dmarc": dmarc, "arc": arc,
+        "compauth": {"result": compauth[0]["result"], "reason": compauth[0]["reason"]} if compauth else None,
+        "authserv_id": trusted["authserv_id"] if trusted else None,
+        "authentication_results": ar_list,
+        "received_spf": rspf,
+    }
+    spam = {"microsoft": A.parse_ms_antispam(hmap), "spamassassin": A.parse_spam_status(hmap)}
+
+    # ----------------------------------------------------------- indicators
+    F: list[dict] = []
+    if not items:
+        F.append(_finding("info", "No headers found", "The input did not contain any recognisable email headers.", "input"))
+    if not hops and items:
+        F.append(_finding("medium", "No Received headers",
+                          "There is no relay path. These may not be the original headers, or the message was injected locally.",
+                          "routing"))
+
+    # authentication findings
+    if dmarc["result"] == "pass":
+        F.append(_finding("pass", "DMARC passed" + (" (computed)" if dmarc["computed"] else ""),
+                          f"The visible From domain ({from_domain or 'n/a'}) is authenticated.", "authentication"))
+    elif dmarc["result"] in ("fail", "permerror", "temperror"):
+        pol = f" Domain policy: p={dmarc['policy']}." if dmarc.get("policy") else ""
+        if (dmarc.get("policy") or "").lower() == "none":
+            pol += " With p=none the domain owner asks receivers not to block spoofed mail, so it may still reach inboxes."
+        F.append(_finding("high", "DMARC failed" + (" (computed)" if dmarc["computed"] else ""),
+                          f"The From domain ({from_domain}) could not be authenticated by aligned SPF or DKIM.{pol}",
+                          "authentication"))
+    if dmarc["result"] == "pass" and (dmarc.get("policy") or "").lower() == "none":
+        F.append(_finding("info", "Sender's DMARC policy is p=none",
+                          f"{from_domain} only monitors spoofing; it does not ask receivers to block it.", "authentication"))
+    if dmarc["result"] in ("none", "unknown", "bestguesspass") and items and from_domain:
+        F.append(_finding("low", "No DMARC verdict",
+                          f"No DMARC result was recorded for {from_domain}; the sender may not publish a DMARC policy.",
+                          "authentication"))
+
+    dmarc_ok = dmarc["result"] == "pass"
+    if spf["result"] == "pass" and spf["aligned"]:
+        F.append(_finding("pass", "SPF passed and aligned", f"Envelope domain {spf['domain'] or 'n/a'} matches From.", "authentication"))
+    elif spf["result"] == "pass":
+        F.append(_finding("info" if dmarc_ok else "medium", "SPF passed for a different domain",
+                          f"The server is authorised to send for {spf['domain'] or 'the envelope domain'}, not for the From domain {from_domain}."
+                          + ("" if dmarc_ok else " An SPF pass on an unrelated domain is a common way to make spoofed mail look authenticated."),
+                          "authentication", "spf-mismatch"))
+    elif spf["result"] in ("fail", "hardfail"):
+        F.append(_finding("high", "SPF failed", f"The sending server is not authorised to send for {spf['domain'] or 'the envelope domain'}.", "authentication"))
+    elif spf["result"] == "softfail":
+        F.append(_finding("medium", "SPF soft-failed", f"The sending server is probably not authorised for {spf['domain'] or 'the envelope domain'}.", "authentication"))
+    elif spf["result"] in ("permerror", "temperror"):
+        F.append(_finding("low", f"SPF {spf['result']}", "The SPF record could not be evaluated.", "authentication"))
+
+    if dkim_result == "pass" and dkim_aligned:
+        F.append(_finding("pass", "DKIM signature valid and aligned",
+                          ", ".join(f"d={x['domain']}" for x in dkim_results if x["result"] == "pass"), "authentication"))
+    elif dkim_result == "pass":
+        signers = ", ".join(sorted({x["domain"] for x in dkim_results if x["result"] == "pass"}))
+        F.append(_finding("info" if dmarc_ok else "medium", "DKIM signed by a different domain",
+                          f"Valid signature from {signers}, but none from {from_domain}."
+                          + ("" if dmarc_ok else " The signature proves who sent it, and it isn't the domain shown in From."),
+                          "authentication", "dkim-mismatch"))
+    elif dkim_result in ("fail", "permerror", "temperror", "neutral", "policy"):
+        F.append(_finding("medium", f"DKIM {dkim_result}", "A DKIM signature was present but did not verify — the message may have been altered.", "authentication"))
+    elif dkim_result == "none" and items:
+        F.append(_finding("low", "Message is not DKIM-signed", "", "authentication"))
+    if dkim_result == "unverified":
+        F.append(_finding("info", "DKIM signature present but no verification result",
+                          "No Authentication-Results header from the receiving server was included.", "authentication"))
+
+    if compauth and compauth[0]["result"] in ("fail", "softfail"):
+        F.append(_finding("high" if compauth[0]["result"] == "fail" else "medium",
+                          f"Microsoft composite authentication {compauth[0]['result']}",
+                          f"reason={compauth[0]['reason']}", "authentication"))
+    if any(cv == "fail" for cv in cvs) or arc["result"] == "fail":
+        F.append(_finding("medium", "ARC chain is broken", "A forwarding service's authentication seal failed validation.", "authentication"))
+
+    # conflicting / forged authentication results
+    if s and rspf and rspf[0]["result"] and s[0]["result"] != rspf[0]["result"]:
+        F.append(_finding("low", "Conflicting SPF results",
+                          f"Authentication-Results says {s[0]['result']} but Received-SPF says {rspf[0]['result']}.", "authentication"))
+    relay_orgs = {org_domain(h.by_host) for h in hops if h.by_host and "." in h.by_host}
+    for extra in ar_list[1:]:
+        sid = (extra["authserv_id"] or "").lower()
+        claims_pass = any(r["result"] == "pass" for r in extra["results"] if r["method"] in ("dmarc", "spf", "dkim"))
+        if sid and claims_pass and org_domain(sid) not in relay_orgs and dmarc["result"] != "pass":
+            F.append(_finding("medium", "Authentication-Results from an unexpected server",
+                              f"A lower Authentication-Results header from {sid} claims a pass, but {sid} does not appear in the relay path. "
+                              "Senders sometimes insert fake results to fool analysts.", "authentication", "forged-ar"))
+            break
+
+    # origin server reputation signals (offline)
+    origin_hop = next((h for h in hops if origin and h.index == origin["hop"]), None)
+    if origin_hop:
+        detail = origin_hop.from_detail.lower()
+        rdns = detail.split("[")[0].strip().rstrip(".") if "[" in detail else ""
+        if rdns == "unknown":
+            F.append(_finding("low", "Sending server has no reverse DNS",
+                              f"{origin_hop.from_ip} did not resolve to a hostname at the receiving server.", "routing", "no-rdns"))
+        host_for_check = rdns if rdns not in ("", "unknown") else origin_hop.from_host.lower()
+        if re.search(r"(\d{1,3}[-.]){3}\d{1,3}|\b(dsl|adsl|dyn|dynamic|dhcp|pool|cable|ppp|pppoe|dial|cust|broadband|residential|"
+                     r"res\.|user|client|ip-\d)", host_for_check):
+            F.append(_finding("medium", "Sent from a residential or dynamic IP",
+                              f"{host_for_check} looks like a home or dynamic connection, not a mail server.", "routing", "dynamic-ip"))
+        helo = origin_hop.from_host.lower().strip("[]")
+        if helo and _looks_ip(helo):
+            F.append(_finding("low", "Sending server greeted with a bare IP address",
+                              f"HELO {helo}; real mail servers normally use their hostname.", "routing"))
+
+    # sender identity findings
+    if from_mb["address"]:
+        name = from_mb["name"]
+        emb = re.search(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", name or "")
+        if emb and domain_of(emb.group(0)) and not aligned(domain_of(emb.group(0)), from_domain):
+            F.append(_finding("high", "Display name contains a different email address",
+                              f'Shows "{emb.group(0)}" but the real sender is {from_mb["address"]}.', "identity"))
+        la = lookalike_brand(from_domain)
+        if la:
+            kind = {"homoglyph": "uses look-alike characters", "typo": "is one character off",
+                    "embedded": "embeds the brand name"}[la["reason"]]
+            F.append(_finding("critical" if la["reason"] != "embedded" else "high",
+                              f"Look-alike domain imitating {brand_label(la['brand'])}",
+                              f"{from_domain} {kind}; the genuine domain is {la['legit_domain']}.", "identity"))
+        brand = brand_in_text(name)
+        if brand and not la:
+            from .domains import BRANDS, LEGIT_EXTRA
+            legit = BRANDS[brand]
+            if org_domain(from_domain) != org_domain(legit) and org_domain(from_domain) not in LEGIT_EXTRA \
+                    and not org_domain(from_domain).startswith(brand + "."):
+                F.append(_finding("medium" if dmarc["result"] == "pass" else "high",
+                                  f"Display name claims to be {brand_label(brand)}",
+                                  f'Name "{name}" but sent from {from_domain}, not {legit}.', "identity"))
+        if is_punycode(from_domain):
+            F.append(_finding("medium", "Sender domain uses punycode (IDN)",
+                              _idna(from_domain), "identity"))
+        if org_domain(from_domain) in FREE_MAIL:
+            F.append(_finding("info", "Sent from a free webmail provider", from_domain, "identity"))
+    elif items:
+        F.append(_finding("medium", "From header missing or unparseable", "", "identity"))
+
+    for rt in reply_to:
+        if rt["domain"] and from_domain and cousin_domain(rt["domain"], from_domain):
+            F.append(_finding("critical", "Reply-To imitates the sender's domain",
+                              f"Replies go to {rt['domain']}, a look-alike of {from_domain}. This is typical of invoice and payroll fraud.",
+                              "identity", "reply-to-cousin"))
+            break
+        if rt["domain"] and from_domain and not aligned(rt["domain"], from_domain):
+            F.append(_finding("medium", "Reply-To differs from From",
+                              f"Replies go to {rt['address']} instead of {from_domain}.", "identity"))
+            break
+    if return_path and return_path["domain"] and from_domain and not aligned(return_path["domain"], from_domain):
+        F.append(_finding("info", "Return-Path differs from From",
+                          f"Bounces go to {return_path['domain']} (common for mailing services).", "identity"))
+    if sender_mb and sender_mb["domain"] and from_domain and not aligned(sender_mb["domain"], from_domain):
+        F.append(_finding("low", "Sender header differs from From", f"Sender: {sender_mb['address']}", "identity"))
+
+    mid = summary["message_id"]
+    if not mid and items:
+        F.append(_finding("medium", "Message-ID missing", "Legitimate mail servers almost always add one.", "message"))
+    elif mid and from_domain:
+        mdom = domain_of(mid.strip("<>"))
+        if mdom and not aligned(mdom, from_domain) and not re.search(
+                r"(google|outlook|prod\.outlook|amazonses|sendgrid|mailgun|mandrillapp|sparkpost|"
+                r"mailchimp|mcsv|salesforce|exacttarget|mail\.gmail)", mdom):
+            F.append(_finding("info", "Message-ID domain differs from From", mdom, "message"))
+
+    if summary["mailer"] and SUSPICIOUS_MAILERS.search(summary["mailer"]):
+        F.append(_finding("low", "Bulk or scripted mailer", summary["mailer"], "message"))
+    if summary["subject"] and URGENCY.search(summary["subject"]):
+        F.append(_finding("low", "Urgent or account-related wording in subject",
+                          f'Matched "{URGENCY.search(summary["subject"]).group(0)}"', "message"))
+    if not first("date") and items:
+        F.append(_finding("medium", "Date header missing", "", "message"))
+    elif not date_dt:
+        F.append(_finding("low", "Date header could not be parsed", first("date"), "message"))
+    elif timed:
+        delta = (date_dt - timed[0].timestamp).total_seconds()
+        if delta > 900:
+            F.append(_finding("low", "Date header is later than the first relay",
+                              f"By {int(delta // 60)} minutes — the Date may have been forged.", "message"))
+        elif delta < -7 * 86400:
+            F.append(_finding("low", "Message was written long before it was sent",
+                              f"{int(-delta // 86400)} days between Date and first relay.", "message"))
+    if items and not summary["to"] and not hmap.get("to"):
+        F.append(_finding("low", "No To recipients", "Recipients were hidden (Bcc / undisclosed).", "message"))
+
+    # routing findings
+    skewed = [h for h in hops if h.clock_skew]
+    if skewed:
+        F.append(_finding("info", "Clock skew between relays",
+                          "Hop " + ", ".join(f"{h.index} ({h.clock_skew:+.0f}s)" for h in skewed)
+                          + " is timestamped before the previous hop — usually a mis-set server clock.", "routing"))
+    slow = [h for h in hops if (h.delay or 0) >= 3600]
+    if slow:
+        F.append(_finding("info", "Significant delivery delay",
+                          ", ".join(f"hop {h.index}: {_human(h.delay)}" for h in slow), "routing"))
+    notz = [h for h in hops if h.timestamp and not h.timestamp_has_tz]
+    if notz:
+        F.append(_finding("info", "Timestamps without a time zone",
+                          "Assumed UTC for hop " + ", ".join(str(h.index) for h in notz) + ".", "routing"))
+    ext = [h for h in hops if h.from_ip and is_public_ip(h.from_ip)]
+    if ext and all(h.tls for h in ext):
+        F.append(_finding("pass", "Encrypted in transit", "Every relay from a public IP used TLS.", "routing"))
+    elif ext and any(not h.tls for h in ext):
+        plain = [str(h.index) for h in ext if not h.tls]
+        F.append(_finding("info", "Some relays show no sign of TLS", "Hop " + ", ".join(plain), "routing"))
+
+    ms = spam["microsoft"]
+    try:
+        scl = int(ms.get("SCL", "-1"))
+    except ValueError:
+        scl = -1
+    if scl >= 5:
+        F.append(_finding("medium", f"Microsoft 365 marked as spam (SCL {scl})", f"SFV={ms.get('SFV', '')} CAT={ms.get('CAT', '')}", "spam"))
+    if ms.get("CAT") in ("PHSH", "HPHSH", "HPHISH", "MALW", "SPOOF", "GIMP", "UIMP", "DIMP"):
+        F.append(_finding("high", f"Microsoft 365 category: {ms['CAT']}", "Microsoft's filter classified this message as phishing, spoofing, impersonation or malware.", "spam"))
+    try:
+        bcl = int(ms.get("BCL", "-1"))
+    except ValueError:
+        bcl = -1
+    if bcl >= 7:
+        F.append(_finding("low", f"Bulk mail (BCL {bcl})", "", "spam"))
+    sa = spam["spamassassin"]
+    if sa.get("flagged"):
+        F.append(_finding("medium", "Flagged as spam by SpamAssassin",
+                          f"score {sa.get('score')}/{sa.get('required')}", "spam"))
+
+    # ---------------------------------------------------------------- content
+    body = None
+    try:
+        body = analyze_body(raw, from_domain)
+    except Exception:
+        body = None
+    if body:
+        for a in body["attachments"]:
+            if a["content_mismatch"] == "Windows executable" or a["double_extension"]:
+                F.append(_finding("critical", "Disguised attachment",
+                                  f"{a['filename']}" + (" is really a Windows program" if a["content_mismatch"] == "Windows executable"
+                                                        else " uses a double extension to hide its real type"), "content"))
+            elif a["risky"]:
+                F.append(_finding("high", f"Risky attachment: {a['kind']}", a["filename"], "content"))
+            elif a["kind"] == "archive":
+                F.append(_finding("low", "Archive attachment", f"{a['filename']} can hide its contents from scanners.", "content"))
+        if body["password_field"] or any(f["action"] for f in body["forms"]):
+            F.append(_finding("high", "Message contains a login or data form",
+                              "Legitimate services do not ask you to enter credentials inside an email or attachment.", "content"))
+        groups = [
+            ("look-alike of", "critical", "Link to a look-alike domain"),
+            ("text shows", "high", "Link text does not match where it goes"),
+            ("script link", "high", "Script link in message"),
+            ("data: URI", "high", "Link opens an embedded page"),
+            ("file / network-share", "high", "Link to a file share"),
+            ("raw IP address", "medium", "Link points to a raw IP address"),
+            ("punycode", "medium", "Link uses a punycode domain"),
+            ("credentials-style @", "medium", "Link hides its real host after an @"),
+            ("free hosting", "medium", "Link to free hosting often used for phishing"),
+            ("URL shortener", "low", "Shortened link hides its destination"),
+        ]
+        for key, sev, title in groups:
+            hits = [lk for lk in body["links"] if any(f.startswith(key) or key in f for f in lk["flags"])]
+            if hits:
+                eg = "; ".join(next(f for f in lk["flags"] if key in f) if key in ("text shows", "look-alike of") else (lk["host"] or lk["href"][:60])
+                               for lk in hits[:3])
+                F.append(_finding(sev, title + (f" ({len(hits)})" if len(hits) > 1 else ""), eg, "content",
+                                  re.sub(r"[^a-z]+", "-", key).strip("-")))
+        cousins = sorted({lk["host"] for lk in body["links"] if lk["host"] and cousin_domain(lk["host"], from_domain)})
+        if cousins:
+            F.append(_finding("high", "Link to a look-alike of the sender's domain", ", ".join(cousins[:3]), "content", "link-cousin"))
+        if body["link_count"] and from_domain and not any(lk["same_org_as_sender"] for lk in body["links"] if lk["host"]):
+            F.append(_finding("info", "No links point to the sender's own domain",
+                              f"{len(body['domains'])} linked domain(s), none belong to {from_domain}.", "content"))
+
+    # domain alignment table: everything that claims an identity, compared to From
+    alignment = [{"label": "From (what you see)", "domain": from_domain, "aligned": None, "note": "reference"}]
+    def _al(label, dom, note=""):
+        if dom:
+            alignment.append({"label": label, "domain": dom, "aligned": aligned(dom, from_domain) if from_domain else None,
+                              "lookalike": bool(from_domain and cousin_domain(dom, from_domain)), "note": note})
+    _al("SPF envelope sender", spf["domain"], f"SPF {spf['result']}")
+    for x in dkim_results:
+        _al("DKIM signer (d=)", x["domain"], f"DKIM {x['result']}")
+    if not dkim_results:
+        for sg in dkim_sigs:
+            _al("DKIM signer (d=)", sg["domain"], "not verified")
+    if return_path:
+        _al("Return-Path", return_path["domain"], "where bounces go")
+    for rt in reply_to:
+        _al("Reply-To", rt["domain"], "where replies go")
+    if sender_mb:
+        _al("Sender", sender_mb["domain"])
+    _al("Message-ID", domain_of(summary["message_id"].strip("<>")), "generated by the sending system")
+    if origin_hop:
+        helo = origin_hop.from_host.strip("[]")
+        if helo and not _looks_ip(helo) and "." in helo:
+            _al("Sending server (HELO)", helo.lower(), origin_hop.from_ip or "")
+    authn["alignment"] = alignment
+
+    # ----------------------------------------------------------------- score
+    order = ["critical", "high", "medium", "low", "info", "pass"]
+    F.sort(key=lambda f: order.index(f["severity"]))
+    score = min(100, sum(SEVERITY_WEIGHT[f["severity"]] for f in F))
+    if any(f["severity"] == "critical" for f in F):
+        score = max(score, 80)
+    if score >= 60:
+        level, label = "high", "High risk"
+    elif score >= 25:
+        level, label = "medium", "Suspicious"
+    else:
+        level, label = "low", "Low risk"
+    if not items:
+        level, label = "none", "No data"
+
+    headers = [{"name": k, "value": decode_mime(v) if k.lower() in ("subject", "from", "to", "cc", "reply-to", "sender") else v,
+                "category": _category(k)} for k, v in items]
+
+    return {
+        "summary": summary,
+        "hops": hop_dicts,
+        "timing": timing,
+        "origin": origin,
+        "auth": authn,
+        "spam": spam,
+        "content": body,
+        "findings": F,
+        "score": {"value": score, "level": level, "label": label},
+        "headers": headers,
+        "stats": {"header_count": len(items), "hop_count": len(hops),
+                  "findings": {s: sum(1 for f in F if f["severity"] == s) for s in order}},
+        "meta": {"analyzed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                 "geoip": geo.database_info()},
+    }
+
+
+def _looks_ip(text: str) -> bool:
+    try:
+        import ipaddress
+        ipaddress.ip_address(text.split("]")[0].strip("[").replace("IPv6:", ""))
+        return True
+    except ValueError:
+        return False
+
+
+def _idna(domain: str) -> str:
+    try:
+        return f"{domain} = {domain.encode('ascii').decode('idna')}"
+    except Exception:
+        return domain
+
+
+def _human(seconds: float | None) -> str:
+    if seconds is None:
+        return "—"
+    s = int(round(seconds))
+    parts = []
+    for unit, size in (("d", 86400), ("h", 3600), ("m", 60), ("s", 1)):
+        if s >= size or (unit == "s" and not parts):
+            parts.append(f"{s // size}{unit}")
+            s %= size
+    return " ".join(parts[:2])

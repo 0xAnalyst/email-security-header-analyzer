@@ -1,0 +1,23 @@
+Delivered-To: victim@example.com
+Received: by 2002:a17:906:1b0e:b0:a9e:44f1:2b0c with SMTP id o14csp45120ejg;
+        Wed, 11 Nov 2026 03:22:41 -0800 (PST)
+Return-Path: <bounce-77@mailer.bulk-sender.ru>
+Received: from vps-29381.hostingco.ru (vps-29381.hostingco.ru. [185.220.101.47])
+        by mx.google.com with ESMTP id m12si77231wrx.402.2026.11.11.03.22.40
+        for <victim@example.com>;
+        Wed, 11 Nov 2026 03:22:40 -0800 (PST)
+Received-SPF: softfail (google.com: domain of transitioning bounce-77@mailer.bulk-sender.ru does not designate 185.220.101.47 as permitted sender) client-ip=185.220.101.47;
+Authentication-Results: mx.google.com;
+       spf=softfail (google.com: domain of transitioning bounce-77@mailer.bulk-sender.ru does not designate 185.220.101.47 as permitted sender) smtp.mailfrom=bounce-77@mailer.bulk-sender.ru;
+       dmarc=fail (p=NONE sp=NONE dis=NONE) header.from=paypa1-security.com
+Received: from [192.168.1.23] (unknown [10.9.8.7])
+        by vps-29381.hostingco.ru (Postfix) with ESMTP id 8A1F2401C2
+        for <victim@example.com>; Wed, 11 Nov 2026 11:22:39 +0000 (UTC)
+From: "service@paypal.com" <service@paypa1-security.com>
+Reply-To: resolution-center@protonmail.com
+To: victim@example.com
+Subject: =?UTF-8?B?VXJnZW50OiBZb3VyIGFjY291bnQgaGFzIGJlZW4gc3VzcGVuZGVk?=
+Date: Wed, 11 Nov 2026 12:10:00 +0000
+X-Mailer: PHPMailer 6.1.4 (https://github.com/PHPMailer/PHPMailer)
+MIME-Version: 1.0
+Content-Type: text/html; charset=UTF-8

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mha"
+dynamic = ["version"]
+description = "E-Mail Header Analyzer: trace relays, check SPF/DKIM/DMARC/ARC and flag phishing indicators"
+readme = "README.md"
+license = { file = "LICENSE.md" }
+requires-python = ">=3.9"
+dependencies = [
+  "Flask>=3.0,<4",
+  "geoip2>=4.8,<6",
+  "python-dateutil>=2.9",
+  "publicsuffixlist>=1.0",
+]
+
+[project.optional-dependencies]
+server = ["gunicorn>=22.0"]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+mha = "mha.__main__:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "mha.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["mha*"]
+
+[tool.setuptools.package-data]
+mha = ["templates/*", "static/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP", "I"]
+ignore = ["E501", "B008"]
