@@ -245,24 +245,43 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .tag.notls { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, transparent); }
 .tag.priv { color: var(--ink-3); }
 .tag.skew { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, transparent); }
-.delay { display: grid; grid-template-columns: 1fr max-content; align-items: center; gap: 10px; margin-top: 7px; max-width: 420px; }
+.delay { margin-top: 8px; max-width: 420px; }
 .delay-bar { height: 6px; background: var(--rule); border-radius: 3px; overflow: hidden; }
 .delay-bar span { display: block; height: 100%; border-radius: 3px; min-width: 2px; }
-.delay-val { font-size: 13.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.delay .tag.slowest { grid-column: 1 / -1; justify-self: start; }
 /* Delay bars are red and sized relative to the longest hop (as in Microsoft's Message Header
-   Analyzer); the slowest hop is emphasised, and hops of 5 minutes or more get a tinted row. */
+   Analyzer). Every hop has a time column; the slowest hop's badge is solid red, other hops of
+   5 minutes or more are outlined in red, and their rows are tinted. */
 .delay-bar span { background: color-mix(in srgb, var(--red) 70%, var(--sheet)); }
 .delay.slowest .delay-bar { background: color-mix(in srgb, var(--red) 18%, transparent); }
 .delay.slowest .delay-bar span { background: var(--red); }
-.delay.slowest .delay-val { color: var(--red); font-weight: 800; }
-.tag.slowest { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, transparent); font-weight: 600; }
+.hop-body { display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 4px 18px; align-items: start; }
+.hop-main { min-width: 0; }
+.hop-time { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; text-align: right; }
+.delay-badge {
+  font: 800 19px/1 var(--sans); font-variant-numeric: tabular-nums; color: var(--ink);
+  padding: 7px 10px 5px; border-radius: var(--r-sm); border: 1.5px solid var(--rule-strong); background: var(--sheet);
+  white-space: nowrap;
+}
+.hop-clock { display: flex; flex-direction: column; align-items: flex-end; font: 600 13px/1.3 var(--mono); color: var(--ink-2); white-space: nowrap; }
+.hop-date { font-weight: 400; font-size: 12px; color: var(--ink-3); }
+.hop-time-label { font-size: 11.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--red); }
+.hop-time.slowest .delay-badge { background: var(--red); border-color: var(--red); color: var(--sheet); }
+.hop-time.slow .delay-badge { border-color: var(--red); color: var(--red); }
 .hop.slow .hop-body {
   background: var(--red-soft); border-left: 3px solid var(--red); border-radius: 0 var(--r-sm) var(--r-sm) 0;
   padding: 8px 12px 10px; margin-top: -3px;
 }
 .hop.slow .hop-num { border-color: var(--red); color: var(--red); }
-.hop.slow .delay-val { color: var(--red); font-weight: 800; }
+.route-summary { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 10px 0 16px; font-size: 15px; }
+.route-summary .rs-k { color: var(--ink-3); }
+.route-summary .rs-slowest b { color: var(--red); }
+@media (max-width: 560px) {
+  .hop-body { grid-template-columns: 1fr; }
+  .hop-time { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 4px 10px; text-align: left; order: -1; }
+  .hop-time-label { order: 2; }
+  .hop-clock { flex-direction: row; gap: 8px; align-items: baseline; }
+  .delay-badge { font-size: 16px; padding: 5px 8px 4px; }
+}
 .route-alert {
   margin: 10px 0 18px; padding: 10px 14px; border-left: 3px solid var(--red); background: var(--red-soft);
   border-radius: 0 var(--r-sm) var(--r-sm) 0; color: var(--ink); font-size: 15px;

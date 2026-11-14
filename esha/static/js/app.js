@@ -47,6 +47,12 @@
     if (isNaN(d)) return iso;
     return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC").replace("Z", " UTC");
   }
+  function fmtClock(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return { time: iso, date: "" };
+    var t = d.toISOString();
+    return { time: t.slice(11, 19) + " UTC", date: t.slice(0, 10) };
+  }
   function toast(msg) {
     var t = h("div", { class: "toast", role: "status", text: msg });
     document.body.append(t);
@@ -325,26 +331,41 @@
       if (hp.from_ip_public) meta.append(h("span", { class: "tag " + (hp.tls ? "tls" : "notls"), text: hp.tls ? "TLS" : "no TLS shown" }));
       else if (hp.tls) meta.append(h("span", { class: "tag tls", text: "TLS" }));
       if (hp.clock_skew) meta.append(h("span", { class: "tag skew", text: "clock " + Math.round(hp.clock_skew) + " s" }));
-      if (hp.timestamp) meta.append(h("span", { text: fmtTime(hp.timestamp) + (hp.timestamp_has_tz ? "" : " (assumed)") }));
+      // Time column: every hop shows how long it took and when it happened.
+      var isSlowest = i > 0 && slowest === hp && hp.delay > 0;
+      var mark = isSlowest ? "slowest" : d >= SLOW ? "slow" : "";
+      var badgeText = i === 0 ? "Start" : hp.delay == null ? "unknown" : hp.delay === 0 ? "0 s" : "+" + dur(hp.delay);
+      var label = isSlowest ? (hp.delay >= SLOW ? "Slowest, slow" : "Slowest") : mark === "slow" ? "Slow" : "";
+      var time = h("div", { class: "hop-time" + (mark ? " " + mark : "") },
+        label ? h("span", { class: "hop-time-label", text: label }) : null,
+        h("span", { class: "delay-badge", text: badgeText,
+          title: i === 0 ? "First recorded hop" : hp.delay == null ? "No timestamp to compare" : "Time since the previous hop" }),
+        hp.timestamp ? h("span", { class: "hop-clock", title: fmtTime(hp.timestamp) },
+          h("span", { text: fmtClock(hp.timestamp).time }), h("span", { class: "hop-date", text: fmtClock(hp.timestamp).date +
+            (hp.timestamp_has_tz ? "" : " (zone assumed)") })) : h("span", { class: "hop-clock", text: "no timestamp" }));
 
-      var delay = null, delayCls = "";
+      var delay = null;
       if (i > 0 && hp.delay != null) {
         var pct = Math.max(1, Math.round((hp.delay / max) * 100));
-        var isSlowest = slowest === hp && hp.delay > 0;
-        if (isSlowest) delayCls = " slowest";
-        delay = h("div", { class: "delay" + delayCls }, h("div", { class: "delay-bar", role: "presentation" }, (function () { var sp = h("span"); sp.style.width = hp.delay ? pct + "%" : "0"; if (!hp.delay) sp.style.minWidth = "0"; return sp; })()),
-          h("span", { class: "delay-val", text: hp.delay === 0 ? "no delay" : "+" + dur(hp.delay) + (hp.delay >= SLOW ? " (slow)" : "") }),
-          isSlowest ? h("span", { class: "tag slowest", text: "Slowest hop" }) : null);
+        delay = h("div", { class: "delay" + (isSlowest ? " slowest" : "") }, h("div", { class: "delay-bar", role: "presentation" },
+          (function () { var sp = h("span"); sp.style.width = hp.delay ? pct + "%" : "0"; if (!hp.delay) sp.style.minWidth = "0"; return sp; })()));
       }
       var fromName = hp.from || (hp.from_ip ? hp.from_ip : "unknown sender");
       ol.append(h("li", { class: cls },
         h("span", { class: "hop-num", "aria-label": "Hop " + hp.hop, text: String(hp.hop) }),
         h("div", { class: "hop-body" },
-          h("div", { class: "hop-line" }, h("span", { class: "hop-host", text: fromName }), h("span", { class: "hop-to", text: "to" }), h("span", { class: "hop-host", text: hp.by || "unknown" })),
-          meta, delay,
-          h("details", { class: "hop-raw" }, h("summary", { text: "Raw header" }), h("pre", { text: "Received: " + hp.raw })))));
+          h("div", { class: "hop-main" },
+            h("div", { class: "hop-line" }, h("span", { class: "hop-host", text: fromName }), h("span", { class: "hop-to", text: "to" }), h("span", { class: "hop-host", text: hp.by || "unknown" })),
+            meta, delay,
+            h("details", { class: "hop-raw" }, h("summary", { text: "Raw header" }), h("pre", { text: "Received: " + hp.raw }))),
+          time)));
     });
     var total = r.timing.total_seconds;
+    var summary = h("div", { class: "route-summary" },
+      h("span", {}, h("span", { class: "rs-k", text: "Total time " }), h("b", { text: total ? dur(total) : "0 s" })),
+      slowest && slowest.delay > 0 ? h("span", { class: "rs-slowest" }, h("span", { class: "rs-k", text: "Slowest " }),
+        h("b", { text: "hop " + slowest.hop + ", +" + dur(slowest.delay) })) : null,
+      h("span", {}, h("span", { class: "rs-k", text: "Hops " }), h("b", { text: String(hops.length) })));
     var alert = null;
     if (slowHops.length) {
       alert = h("p", { class: "route-alert", role: "note" },
@@ -354,7 +375,7 @@
     }
     return h("section", { "aria-labelledby": "r-t" }, h("h2", { class: "section-title", id: "r-t", text: "Route" }),
       h("p", { class: "section-note", text: hops.length + " relay" + (hops.length > 1 ? "s" : "") + ", from the sender's server at the top to your mailbox at the bottom." }),
-      alert, ol, h("p", { class: "route-total", text: total ? "Delivered in " + dur(total) + "." : "" }), geoNote(r));
+      summary, alert, ol, geoNote(r));
   }
 
   function geoNote(r) {
