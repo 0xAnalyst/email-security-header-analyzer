@@ -101,7 +101,7 @@
     engineStatus.setAttribute("data-state", state);
   }
   if (ENGINE === "browser") {
-    setEngineStatus("Loading the analysis engine (about 6 MB, cached after the first visit)…", "loading");
+    setEngineStatus("Loading the analysis engine (first visit only; your browser caches it)…", "loading");
     callWorker({ type: "warmup" }).then(function () {
       setEngineStatus("Engine ready. Analysis runs in this browser tab; nothing is uploaded.", "ready");
     }, function (e) { setEngineStatus(e.message, "error"); });

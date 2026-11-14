@@ -38,7 +38,7 @@ Every result is combined into a 0–100 risk score with a plain-language explana
 
 ESHA is published as a static site on GitHub Pages: **https://0xanalyst.github.io/email-security-header-analyzer/**
 
-The hosted version runs the same Python analyzer inside your browser tab with [Pyodide](https://pyodide.org) (WebAssembly). Headers and `.eml` files you open are never uploaded. GitHub serves the page's files and doesn't see any email content. The page's Content Security Policy (`connect-src 'self'`) blocks it from contacting any other server, and Pyodide is hosted with the site rather than loaded from a CDN. The first visit downloads about 14 MB, which your browser then caches.
+The hosted version runs the same Python analyzer inside your browser tab with [Pyodide](https://pyodide.org) (WebAssembly). Headers and `.eml` files you open are never uploaded. GitHub serves the page's files and doesn't see any email content. The page's Content Security Policy (`connect-src 'self'`) blocks it from contacting any other server, and Pyodide is hosted with the site rather than loaded from a CDN. The first visit downloads about 14 MB (less after compression), which your browser then caches.
 
 To build and preview the static site yourself:
 ```sh
