@@ -34,7 +34,22 @@ Built for SOC analysts, incident responders and IT admins who triage suspicious 
 
 Every result is combined into a 0–100 risk score with a plain-language explanation for each finding. The score is heuristic: treat it as triage, not proof.
 
-## Run it
+## Use it in your browser
+
+ESHA is published as a static site on GitHub Pages: **https://0xanalyst.github.io/email-security-header-analyzer/**
+
+The hosted version runs the same Python analyzer inside your browser tab with [Pyodide](https://pyodide.org) (WebAssembly). Headers and `.eml` files you open are never uploaded. GitHub serves the page's files and doesn't see any email content. The page's Content Security Policy (`connect-src 'self'`) blocks it from contacting any other server, and Pyodide is hosted with the site rather than loaded from a CDN. The first visit downloads about 14 MB, which your browser then caches.
+
+To build and preview the static site yourself:
+```sh
+pip install -r requirements.txt
+python scripts/build_site.py               # writes ./site
+python -m http.server -d site 8000         # http://127.0.0.1:8000
+node scripts/check_site.js site tests/samples   # optional smoke test of the in-browser engine
+```
+Every push to `main` rebuilds and deploys the site (`.github/workflows/pages.yml`).
+
+## Run it locally
 
 You need Python 3.9 or newer.
 
@@ -105,7 +120,7 @@ The databases are saved to `esha/static/data`. To keep them elsewhere, use `--de
 
 ```sh
 pip install -r requirements-dev.txt
-pytest            # 39 tests, including real-world style samples in tests/samples
+pytest            # 42 tests, including real-world style samples in tests/samples
 ruff check esha tests
 ```
 
@@ -120,6 +135,8 @@ Project layout:
 | `esha/core/analyzer.py` | Findings, alignment and scoring |
 | `esha/app.py` | Flask web app and JSON API |
 | `esha/__main__.py` | Command line |
+| `esha/static/js/worker.js` | In-browser engine (Pyodide) used by the static site |
+| `scripts/build_site.py` | Builds the GitHub Pages site into `./site` |
 
 ## Credits and license
 

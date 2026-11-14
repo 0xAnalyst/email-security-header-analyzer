@@ -9,3 +9,5 @@ build/
 dist/
 geoip/
 .DS_Store
+site/
+.cache/

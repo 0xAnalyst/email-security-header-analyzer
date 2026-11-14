@@ -230,3 +230,37 @@ def test_link_text_mismatch_flag():
 def test_cyrillic_homoglyph_sender():
     r = analyze('From: "PayPal" <service@раураl.com>\nTo: a@b.com\nSubject: hi\n')
     assert any(f["title"] == "Look-alike domain imitating PayPal" and f["severity"] == "critical" for f in r["findings"])
+
+
+# ------------------------------------------------------------ static site
+def _load_build_site():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("build_site", Path(__file__).parent.parent / "scripts" / "build_site.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_static_site_page_runs_in_browser_with_strict_csp():
+    html = _load_build_site().render_index()
+    assert '<meta name="esha-engine" content="browser">' in html
+    assert "connect-src 'self'" in html and "script-src 'self' 'wasm-unsafe-eval'" in html
+    assert '"/static/' not in html, "static URLs must be relative so the site works under /<repo>/"
+    assert "never uploaded" in html
+
+
+def test_server_page_uses_server_engine(client):
+    html = client.get("/").get_data(as_text=True)
+    assert '<meta name="esha-engine" content="server">' in html
+    assert "wasm-unsafe-eval" not in html
+
+
+def test_static_bundle_contains_engine_and_pure_python_deps(tmp_path):
+    import zipfile
+    dest = tmp_path / "bundle.zip"
+    _load_build_site().build_bundle(dest)
+    names = set(zipfile.ZipFile(dest).namelist())
+    assert {"esha/core/analyzer.py", "esha/static/data/GeoLite2-Country.mmdb", "maxminddb/reader.py",
+            "publicsuffixlist/__init__.py", "dateutil/parser/__init__.py"} <= names
+    assert not any(n.endswith((".so", ".pyd", ".pyc")) for n in names), "the browser cannot load native extensions"
+    assert not any(n.startswith(("esha/app", "flask/")) for n in names)

@@ -62,26 +62,86 @@
   });
 
   /* ---------------- input ---------------- */
+  /* Two engines: "server" posts to the Flask API; "browser" (static hosting such as
+     GitHub Pages) runs the same Python analyzer locally in a Pyodide Web Worker. */
+  var engineMeta = document.querySelector('meta[name="esha-engine"]');
+  var ENGINE = engineMeta ? engineMeta.getAttribute("content") : "server";
+  var engineStatus = $("#engine-status");
+  var worker = null, seq = 0, pending = {};
+
+  function failAll(msg) {
+    Object.keys(pending).forEach(function (k) { pending[k].reject(new Error(msg)); });
+    pending = {};
+  }
+  function engineWorker() {
+    if (worker) return worker;
+    worker = new Worker("static/js/worker.js");
+    worker.onmessage = function (e) {
+      var p = pending[e.data.id];
+      if (!p) return;
+      delete pending[e.data.id];
+      if (e.data.ok) p.resolve(e.data.result); else p.reject(new Error(e.data.error || "The analysis failed."));
+    };
+    worker.onerror = function () {
+      worker = null;
+      failAll("The analysis engine could not be loaded. Reload the page to try again.");
+    };
+    return worker;
+  }
+  function callWorker(msg, transfer) {
+    return new Promise(function (resolve, reject) {
+      msg.id = ++seq;
+      pending[msg.id] = { resolve: resolve, reject: reject };
+      engineWorker().postMessage(msg, transfer || []);
+    });
+  }
+  function setEngineStatus(text, state) {
+    if (!engineStatus) return;
+    engineStatus.textContent = text;
+    engineStatus.setAttribute("data-state", state);
+  }
+  if (ENGINE === "browser") {
+    setEngineStatus("Loading the analysis engine (about 6 MB, cached after the first visit)…", "loading");
+    callWorker({ type: "warmup" }).then(function () {
+      setEngineStatus("Engine ready. Analysis runs in this browser tab; nothing is uploaded.", "ready");
+    }, function (e) { setEngineStatus(e.message, "error"); });
+  }
+
+  function runAnalysis(body) {
+    if (ENGINE === "browser") {
+      if (body instanceof Blob) {
+        var name = body.name || "";
+        return body.arrayBuffer().then(function (buf) {
+          return callWorker({ bytes: buf, fromFile: /\.(eml|mbox)$/i.test(name) }, [buf]);
+        });
+      }
+      return callWorker({ text: body });
+    }
+    var opts = { method: "POST" };
+    if (body instanceof Blob) { var fd = new FormData(); fd.append("file", body, body.name || "message.eml"); opts.body = fd; }
+    else { opts.headers = { "Content-Type": "application/json" }; opts.body = JSON.stringify({ headers: body }); }
+    return fetch("api/analyze", opts)
+      .catch(function () { throw new Error("The server could not be reached. Check that ESHA is still running."); })
+      .then(function (r) {
+        return r.json().then(function (j) {
+          if (!r.ok) throw new Error(j.error || "The server could not analyze these headers.");
+          return j;
+        });
+      });
+  }
+
   function analyze(body) {
     showError("");
     btnAnalyze.disabled = true; btnAnalyze.textContent = "Analyzing…";
-    var opts = { method: "POST" };
-    if (body instanceof FormData) opts.body = body;
-    else { opts.headers = { "Content-Type": "application/json" }; opts.body = JSON.stringify({ headers: body }); }
-    return fetch("/api/analyze", opts)
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-      .then(function (res) {
-        if (!res.ok) throw new Error(res.j.error || "The server could not analyze these headers.");
-        last = res.j; render(res.j);
-      })
-      .catch(function (e) { showError(e.message || "The server could not be reached. Check that ESHA is still running."); })
+    return runAnalysis(body)
+      .then(function (j) { last = j; render(j); })
+      .catch(function (e) { showError(e.message || "The analysis failed."); })
       .finally(function () { btnAnalyze.disabled = false; btnAnalyze.textContent = "Analyze headers"; });
   }
   function analyzeFile(file) {
     if (!file) return;
-    var fd = new FormData(); fd.append("file", file);
     file.text().then(function (t) { ta.value = t.split(/\r?\n\r?\n/)[0]; });
-    analyze(fd);
+    analyze(file);
   }
 
   form.addEventListener("submit", function (e) {
@@ -107,7 +167,7 @@
   });
   document.querySelectorAll("[data-sample]").forEach(function (b) {
     b.addEventListener("click", function () {
-      fetch("/static/samples/" + b.getAttribute("data-sample")).then(function (r) { return r.text(); })
+      fetch("static/samples/" + b.getAttribute("data-sample")).then(function (r) { return r.text(); })
         .then(function (t) { ta.value = t.trim(); analyze(ta.value); });
     });
   });
@@ -115,7 +175,7 @@
   btnNew.addEventListener("click", function () {
     report.hidden = true; intake.hidden = false;
     [btnNew, btnExport, btnCopy].forEach(function (b) { b.hidden = true; });
-    history.replaceState(null, "", "/");
+    history.replaceState(null, "", location.pathname);
     ta.focus(); ta.select();
   });
   btnExport.addEventListener("click", function () {

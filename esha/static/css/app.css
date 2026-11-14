@@ -124,6 +124,16 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .howto dd { margin: 2px 0 0; }
 .howto em { font-style: normal; font-weight: 600; color: var(--ink); }
 .privacy { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--rule); }
+.engine-status { margin: 8px 0 0; font-size: 14px; color: var(--ink-3); padding-left: 16px; position: relative; }
+.engine-status:empty { display: none; }
+.engine-status::before { content: ""; position: absolute; left: 0; top: 0.45em; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
+.engine-status[data-state="ready"]::before { background: var(--green); }
+.engine-status[data-state="error"] { color: var(--red); }
+.engine-status[data-state="error"]::before { background: var(--red); }
+@media (prefers-reduced-motion: no-preference) {
+  .engine-status[data-state="loading"]::before { animation: esha-pulse 1.2s ease-in-out infinite; }
+}
+@keyframes esha-pulse { 50% { opacity: 0.25; } }
 
 /* ---------- report ---------- */
 .report { padding-top: 20px; }

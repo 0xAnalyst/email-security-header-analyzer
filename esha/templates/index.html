@@ -3,6 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="esha-engine" content="{{ engine or 'server' }}">
+{%- if engine == 'browser' %}
+  {#- Static hosting (GitHub Pages) cannot send HTTP headers, so the policy is set here.
+      connect-src 'self' means the page can only fetch ESHA's own files. #}
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+{%- endif %}
   <title>Email Security Header Analyzer (ESHA)</title>
   <meta name="description" content="Email Security Header Analyzer: detect spoofing, SPF, DKIM and DMARC mismatches, and phishing signs in email headers and .eml files.">
   <link rel="icon" href="{{ url_for('static', filename='imgs/fav.png') }}">
@@ -64,7 +71,12 @@
           <dt>Apple Mail</dt><dd><em>View › Message › All Headers</em>, or drag the message to your desktop to save an .eml.</dd>
           <dt>Thunderbird</dt><dd><em>More › View Source</em>, or press Ctrl+U.</dd>
         </dl>
+        {%- if engine == 'browser' %}
+        <p class="privacy">Analysis runs entirely in your browser. Headers and files you open are never uploaded, sent to third-party services or stored.</p>
+        <p class="engine-status" id="engine-status" role="status" data-state="loading"></p>
+        {%- else %}
         <p class="privacy">Headers are analyzed by this server only. Nothing is sent to third-party services, and nothing is stored.</p>
+        {%- endif %}
       </aside>
     </section>
 
