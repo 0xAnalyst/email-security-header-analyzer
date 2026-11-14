@@ -247,9 +247,27 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .tag.skew { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, transparent); }
 .delay { display: grid; grid-template-columns: 1fr max-content; align-items: center; gap: 10px; margin-top: 7px; max-width: 420px; }
 .delay-bar { height: 6px; background: var(--rule); border-radius: 3px; overflow: hidden; }
-.delay-bar span { display: block; height: 100%; background: var(--blue); border-radius: 3px; min-width: 2px; }
-.delay-bar.slow span { background: var(--amber); }
+.delay-bar span { display: block; height: 100%; border-radius: 3px; min-width: 2px; }
 .delay-val { font-size: 13.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.delay .tag.slowest { grid-column: 1 / -1; justify-self: start; }
+/* Delay bars are red and sized relative to the longest hop (as in Microsoft's Message Header
+   Analyzer); the slowest hop is emphasised, and hops of 5 minutes or more get a tinted row. */
+.delay-bar span { background: color-mix(in srgb, var(--red) 70%, var(--sheet)); }
+.delay.slowest .delay-bar { background: color-mix(in srgb, var(--red) 18%, transparent); }
+.delay.slowest .delay-bar span { background: var(--red); }
+.delay.slowest .delay-val { color: var(--red); font-weight: 800; }
+.tag.slowest { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, transparent); font-weight: 600; }
+.hop.slow .hop-body {
+  background: var(--red-soft); border-left: 3px solid var(--red); border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  padding: 8px 12px 10px; margin-top: -3px;
+}
+.hop.slow .hop-num { border-color: var(--red); color: var(--red); }
+.hop.slow .delay-val { color: var(--red); font-weight: 800; }
+.route-alert {
+  margin: 10px 0 18px; padding: 10px 14px; border-left: 3px solid var(--red); background: var(--red-soft);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0; color: var(--ink); font-size: 15px;
+}
+.route-alert b { color: var(--red); }
 .hop-raw { margin-top: 6px; }
 .hop-raw summary { font-size: 13.5px; color: var(--ink-3); cursor: pointer; width: max-content; }
 .hop-raw pre { font: 12.5px/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r-sm); padding: 10px 12px; margin: 6px 0 0; color: var(--ink-2); }

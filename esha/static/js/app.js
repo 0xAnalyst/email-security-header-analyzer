@@ -308,9 +308,16 @@
     var hops = r.hops;
     if (!hops.length) return h("section", {}, h("h2", { class: "section-title", text: "Route" }), h("p", { class: "empty", text: "No Received headers, so the relay path can't be traced." }));
     var max = Math.max.apply(null, hops.map(function (x) { return x.delay || 0; }).concat([1]));
+    // Like Microsoft's Message Header Analyzer: each delay gets a red bar sized relative to the
+    // longest one, the slowest hop is always marked, and hops of 5 minutes or more are flagged.
+    var SLOW = 300;
+    var slowest = hops.reduce(function (best, x, i) { return i > 0 && (x.delay || 0) > ((best && best.delay) || 0) ? x : best; }, null);
+    var slowHops = hops.filter(function (x, i) { return i > 0 && (x.delay || 0) >= SLOW; });
     var ol = h("ol", { class: "route" });
     hops.forEach(function (hp, i) {
-      var cls = "hop" + (r.origin && r.origin.hop === hp.hop ? " origin" : "") + (i === hops.length - 1 ? " final" : "");
+      var d = i > 0 ? hp.delay || 0 : 0;
+      var speed = d >= SLOW ? " slow" : "";
+      var cls = "hop" + (r.origin && r.origin.hop === hp.hop ? " origin" : "") + (i === hops.length - 1 ? " final" : "") + speed;
       var meta = h("div", { class: "hop-meta" });
       if (hp.from_ip) meta.append(h("span", {}, flag(hp.geo), h("span", { class: "ip", text: hp.from_ip }), hp.geo ? " " + geoText(hp.geo) : ""));
       if (hp.from_ip && !hp.from_ip_public) meta.append(h("span", { class: "tag priv", text: "internal" }));
@@ -320,11 +327,14 @@
       if (hp.clock_skew) meta.append(h("span", { class: "tag skew", text: "clock " + Math.round(hp.clock_skew) + " s" }));
       if (hp.timestamp) meta.append(h("span", { text: fmtTime(hp.timestamp) + (hp.timestamp_has_tz ? "" : " (assumed)") }));
 
-      var delay = null;
+      var delay = null, delayCls = "";
       if (i > 0 && hp.delay != null) {
         var pct = Math.max(1, Math.round((hp.delay / max) * 100));
-        delay = h("div", { class: "delay" }, h("div", { class: "delay-bar" + (hp.delay >= 300 ? " slow" : ""), role: "presentation" }, (function () { var sp = h("span"); sp.style.width = pct + "%"; return sp; })()),
-          h("span", { class: "delay-val", text: hp.delay === 0 ? "no delay" : "+" + dur(hp.delay) }));
+        var isSlowest = slowest === hp && hp.delay > 0;
+        if (isSlowest) delayCls = " slowest";
+        delay = h("div", { class: "delay" + delayCls }, h("div", { class: "delay-bar", role: "presentation" }, (function () { var sp = h("span"); sp.style.width = hp.delay ? pct + "%" : "0"; if (!hp.delay) sp.style.minWidth = "0"; return sp; })()),
+          h("span", { class: "delay-val", text: hp.delay === 0 ? "no delay" : "+" + dur(hp.delay) + (hp.delay >= SLOW ? " (slow)" : "") }),
+          isSlowest ? h("span", { class: "tag slowest", text: "Slowest hop" }) : null);
       }
       var fromName = hp.from || (hp.from_ip ? hp.from_ip : "unknown sender");
       ol.append(h("li", { class: cls },
@@ -335,9 +345,16 @@
           h("details", { class: "hop-raw" }, h("summary", { text: "Raw header" }), h("pre", { text: "Received: " + hp.raw })))));
     });
     var total = r.timing.total_seconds;
+    var alert = null;
+    if (slowHops.length) {
+      alert = h("p", { class: "route-alert", role: "note" },
+        h("b", { text: slowHops.length === 1 ? "1 slow hop. " : slowHops.length + " slow hops. " }),
+        slowHops.map(function (x) { return "Hop " + x.hop + " took " + dur(x.delay); }).join("; ") +
+        ". Hops of 5 minutes or more are shown in red; long queues often point to spam filtering, greylisting or a server problem.");
+    }
     return h("section", { "aria-labelledby": "r-t" }, h("h2", { class: "section-title", id: "r-t", text: "Route" }),
       h("p", { class: "section-note", text: hops.length + " relay" + (hops.length > 1 ? "s" : "") + ", from the sender's server at the top to your mailbox at the bottom." }),
-      ol, h("p", { class: "route-total", text: total ? "Delivered in " + dur(total) + "." : "" }), geoNote(r));
+      alert, ol, h("p", { class: "route-total", text: total ? "Delivered in " + dur(total) + "." : "" }), geoNote(r));
   }
 
   function geoNote(r) {
