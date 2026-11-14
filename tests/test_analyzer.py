@@ -273,3 +273,9 @@ def test_fake_list_id_does_not_soften_reply_to_on_spoofed_mail():
             "To: a@example.com\nSubject: hi\nDate: Fri, 13 Nov 2026 10:00:00 +0000\nMessage-ID: <1@bank.example>\n")
     f = next(f for f in analyze(text)["findings"] if f["rule_id"] == "ESHA-108")
     assert f["severity"] == "medium"
+
+
+def test_web_samples_match_test_samples():
+    web = Path(__file__).parent.parent / "esha" / "static" / "samples"
+    for f in web.glob("*.eml"):
+        assert f.read_bytes() == (SAMPLES / f.name).read_bytes(), f"{f.name} differs from tests/samples"

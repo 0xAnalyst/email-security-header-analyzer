@@ -115,7 +115,8 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .intake-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 14px; margin-top: 14px; }
 .file-btn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .file-btn:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
-.samples { color: var(--ink-2); font-size: 15px; }
+.samples { color: var(--ink-2); font-size: 15px; flex-basis: 100%; }
+.print-only { display: none; }
 .error { color: var(--red); font-weight: 600; margin: 12px 0 0; }
 .howto { font-size: 15px; color: var(--ink-2); padding-top: 30px; }
 .howto h2 { font-size: 17px; color: var(--ink); margin: 0 0 10px; }
@@ -399,6 +400,10 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
   .topnav .icon-btn { width: 34px; height: 34px; flex: none; }
 }
 @media print {
+  .print-only { display: block; }
+  .tabpanel .section-title { margin-top: 20px; page-break-after: avoid; }
+  .finding, .hop, .att-list li, tr { page-break-inside: avoid; }
+  .f-more { display: none; }
   .tablist { display: none; }
   .tabpanel[hidden] { display: block !important; }
   .tabpanel { padding-top: 16px; }

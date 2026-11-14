@@ -1,0 +1,48 @@
+Delivered-To: analyst@example.com
+Received: by 2002:a05:7300:9c11:b0:12f:3a51:77e2 with SMTP id r17csp551201dyb;
+        Fri, 13 Nov 2026 02:00:41 -0800 (PST)
+Return-Path: <bounce@example-hr.example>
+Received: from mail-relay.example-hr.example (mail-relay.example-hr.example. [194.180.48.33])
+        by mx.google.com with ESMTPS id 5b1f17b1804b1-43a1c2d3e4fsi118842f8f.211.2026.11.13
+        for <analyst@example.com>
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Fri, 13 Nov 2026 02:00:41 -0800 (PST)
+Received-SPF: pass (google.com: domain of bounce@example-hr.example designates 194.180.48.33 as permitted sender) client-ip=194.180.48.33;
+Authentication-Results: mx.google.com;
+       spf=pass (google.com: domain of bounce@example-hr.example designates 194.180.48.33 as permitted sender) smtp.mailfrom=bounce@example-hr.example;
+       dmarc=fail (p=NONE sp=NONE dis=NONE) header.from=example.com
+From: HR Department <hr@example.com>
+To: analyst@example.com
+Subject: Invitation: Mandatory: 2027 benefits enrolment @ Mon 16 Nov 2026 09:00 (UTC)
+Date: Fri, 13 Nov 2026 10:00:02 +0000
+Message-ID: <invite.7f3c1e2a@example-hr.example>
+Content-Type: multipart/alternative; boundary="esha-sample-boundary"
+MIME-Version: 1.0
+
+--esha-sample-boundary
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+WW91IGhhdmUgYmVlbiBpbnZpdGVkIHRvOiBNYW5kYXRvcnk6IDIwMjcgYmVuZWZpdHMgZW5yb2xt
+ZW50
+
+--esha-sample-boundary
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+Content-Type: text/calendar; charset="utf-8"; method="REQUEST"
+
+QkVHSU46VkNBTEVOREFSDQpQUk9ESUQ6LS8vRVNIQS8vc2FtcGxlLy9FTg0KVkVSU0lPTjoyLjAN
+Ck1FVEhPRDpSRVFVRVNUDQpCRUdJTjpWRVZFTlQNCkRUU1RBUlQ6MjAyNjExMTZUMDkwMDAwWg0K
+RFRFTkQ6MjAyNjExMTZUMDkzMDAwWg0KRFRTVEFNUDoyMDI2MTExM1QxMDAwMDBaDQpPUkdBTkla
+RVI7Q049SFIgRGVwYXJ0bWVudDptYWlsdG86aHItbm90aWNlQGJlbmVmaXRzLXVwZGF0ZS5leGFt
+cGxlDQpVSUQ6N2YzYzFlMmEtOWI0NC00ZDFlLThhMjEtMmY2YzBlOWQxYjc3QGJlbmVmaXRzLXVw
+ZGF0ZS5leGFtcGxlDQpBVFRFTkRFRTtDTj1BbmFseXN0O1JPTEU9UkVRLVBBUlRJQ0lQQU5UO1JT
+VlA9VFJVRTptYWlsdG86YW5hbHlzdEBleGFtcGxlLmNvbQ0KU1VNTUFSWTpNYW5kYXRvcnk6IDIw
+MjcgYmVuZWZpdHMgZW5yb2xtZW50DQpERVNDUklQVElPTjpZb3VyIGJlbmVmaXRzIHNlbGVjdGlv
+biBleHBpcmVzIE1vbmRheS4gUmV2aWV3IGFuZCBzaWduIGhlcmU6IGh0dHBzOi8vYmVuZWZpdHMt
+dXBkYXRlLmV4YW1wbGUvcw0KIGlnbj91PWFuYWx5c3RcblF1ZXN0aW9ucz8gUmVwbHkgdG8gSFIu
+DQpMT0NBVElPTjpodHRwczovL2JlbmVmaXRzLXVwZGF0ZS5leGFtcGxlL21lZXQNClNUQVRVUzpD
+T05GSVJNRUQNCkVORDpWRVZFTlQNCkVORDpWQ0FMRU5EQVINCg==
+
+--esha-sample-boundary--

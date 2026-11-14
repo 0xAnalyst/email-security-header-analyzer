@@ -173,8 +173,10 @@
   });
   document.querySelectorAll("[data-sample]").forEach(function (b) {
     b.addEventListener("click", function () {
-      fetch("static/samples/" + b.getAttribute("data-sample")).then(function (r) { return r.text(); })
-        .then(function (t) { ta.value = t.trim(); analyze(ta.value); });
+      // Samples are whole .eml files, so analyze them as a dropped file (headers and body).
+      var name = b.getAttribute("data-sample");
+      fetch("static/samples/" + name).then(function (r) { return r.blob(); })
+        .then(function (blob) { analyzeFile(new File([blob], name, { type: "message/rfc822" })); });
     });
   });
 
@@ -540,9 +542,10 @@
       var b = h("button", { type: "button", class: "tab", role: "tab", id: tid, "aria-controls": pid,
         "aria-selected": i === 0 ? "true" : "false", tabindex: i === 0 ? "0" : "-1" },
         d.label, d.count != null ? h("span", { class: "n" + (d.alert ? " alert" : ""), text: String(d.count) }) : null);
-      // Section headings duplicate the tab labels, so panels are labelled by their tab instead.
+      // On screen the tab label is the heading; the section's own heading is kept for printing.
       var t = d.el.querySelector(".section-title");
-      if (t) t.remove();
+      if (t) { t.classList.add("print-only"); t.removeAttribute("id"); }
+      d.el.removeAttribute("aria-labelledby");
       d.el.classList.remove("block");
       var panel = h("div", { class: "tabpanel", role: "tabpanel", id: pid, "aria-labelledby": tid, tabindex: "0", hidden: i !== 0 }, d.el);
       b.addEventListener("click", function () { select(i, false); });
