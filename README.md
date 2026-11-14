@@ -38,7 +38,9 @@ Every result is combined into a 0–100 risk score with a plain-language explana
 
 You need Python 3.9 or newer.
 
-**macOS / Linux**
+**macOS**: double-click `Start MHA.command` in Finder, or run `./run.sh` in Terminal.
+
+**Linux**
 ```sh
 ./run.sh
 ```
