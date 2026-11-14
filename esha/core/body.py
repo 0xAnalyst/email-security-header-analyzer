@@ -201,6 +201,20 @@ def analyze_body(raw: str, from_domain: str = "") -> dict | None:
             links.append({"href": u, "text": "", "source": source})
 
     for part in msg.walk():
+        if part.get_content_type() == "message/rfc822" and len(attachments) < 500:
+            # An attached email: list it, then keep walking into its own parts.
+            try:
+                inner = part.get_payload(0)
+                blob = inner.as_bytes() if inner is not None else b""
+            except Exception:
+                inner, blob = None, b""
+            attachments.append({
+                "filename": part.get_filename() or "(attached message)", "content_type": "message/rfc822", "size": len(blob),
+                "extension": "eml", "sha256": hashlib.sha256(blob).hexdigest(),
+                "md5": hashlib.md5(blob, usedforsecurity=False).hexdigest(),  # identification only
+                "kind": "email message", "risky": False, "double_extension": False, "content_mismatch": "",
+                "container": None, "smuggling": [],
+                "subject": str((inner or {}).get("Subject", "") if inner is not None else "")[:200]})
         if part.is_multipart():
             continue
         ctype = part.get_content_type()

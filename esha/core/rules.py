@@ -87,7 +87,7 @@ _RULES = [
          "If this is your domain, move to p=quarantine or p=reject once reports show legitimate mail aligns."),
     Rule("ESHA-004", "dmarc-missing", "No DMARC verdict", "low", "authentication",
          "No DMARC result was recorded; the sender may not publish a DMARC policy.",
-         "Missing DMARC makes the From domain easy to spoof. Weigh the other findings more heavily."),
+         "Missing DMARC makes the From domain easy to spoof. Weigh the other findings more heavily.", also=("info",)),
     Rule("ESHA-005", "spf-aligned", "SPF passed and aligned", "pass", "authentication",
          "The sending server is authorised for the envelope domain, which matches From."),
     Rule("ESHA-006", "spf-mismatch", "SPF passed for a different domain", "medium", "authentication",
@@ -113,7 +113,7 @@ _RULES = [
          "Mailing lists and forwarding can break signatures. Without that explanation, assume tampering.",
          also=("info",)),
     Rule("ESHA-013", "dkim-none", "Message is not DKIM-signed", "low", "authentication",
-         "No DKIM signature, so the content and From address are not cryptographically protected."),
+         "No DKIM signature, so the content and From address are not cryptographically protected.", also=("info",)),
     Rule("ESHA-014", "dkim-unverified", "DKIM signature present but no verification result", "info", "authentication",
          "The headers contain a DKIM signature but no receiving server's verification result."),
     Rule("ESHA-015", "compauth-fail", "Microsoft composite authentication failed", "high", "authentication",
@@ -182,7 +182,7 @@ _RULES = [
     # ----------------------------------------------------------------- routing
     Rule("ESHA-201", "no-received", "No Received headers", "medium", "routing",
          "There is no relay path. These may not be the original headers, or the message was injected locally.",
-         "Get the full original headers (Show original / View source) before drawing conclusions."),
+         "Get the full original headers (Show original / View source) before drawing conclusions.", also=("info",)),
     Rule("ESHA-202", "no-rdns", "Sending server has no reverse DNS", "low", "routing",
          "Legitimate mail servers almost always have a reverse DNS name."),
     Rule("ESHA-203", "dynamic-ip", "Sent from a residential or dynamic IP", "medium", "routing",
@@ -326,6 +326,13 @@ _RULES = [
     # ------------------------------------------------------------------ input
     Rule("ESHA-900", "no-headers", "No headers found", "info", "input",
          "The input did not contain any recognisable email headers."),
+    Rule("ESHA-901", "msg-no-transport", "Outlook .msg without transport headers", "info", "input",
+         "The .msg file has no original internet headers, usually because it was saved from Sent Items or "
+         "Drafts. There is no relay route or authentication result to check.",
+         "Ask for the message from the recipient's Inbox, or for the original as an .eml attachment."),
+    Rule("ESHA-902", "msg-rtf-body", "Message body not readable", "info", "input",
+         "The .msg body is stored only as compressed RTF, which ESHA does not decode, so links and forms in "
+         "the body were not checked.", "Save the message as .eml (or forward it as an attachment) to check the body."),
 ]
 
 RULES: dict[str, Rule] = {r.key: r for r in _RULES}

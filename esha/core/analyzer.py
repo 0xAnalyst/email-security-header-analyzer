@@ -128,7 +128,9 @@ def _finalize(findings: list[dict], cfg: ScoringConfig) -> list[dict]:
     return out
 
 
-def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = None) -> dict:
+def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = None, source: dict | None = None) -> dict:
+    """Analyze headers or a whole message. ``source`` describes a converted input,
+    such as an Outlook .msg ({"format": "msg", "transport_headers": bool, "notes": [...]})."""
     raw = normalize(text or "", from_file=from_file)
     msg = HeaderParser().parsestr(raw, headersonly=True)
     items = [(k, v) for k, v in msg.items()]
@@ -304,10 +306,13 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
 
     # ----------------------------------------------------------- indicators
     F: list[dict] = []
+    # A .msg saved from Sent Items or Drafts never passed a receiving server, so a
+    # missing route or authentication result is expected rather than suspicious.
+    no_transport = bool(source and source.get("format") == "msg" and not source.get("transport_headers"))
     if not items:
         F.append(_finding("no-headers", "info", "No headers found", "The input did not contain any recognisable email headers.", "input"))
     if not hops and items:
-        F.append(_finding("no-received", "medium", "No Received headers",
+        F.append(_finding("no-received", "info" if no_transport else "medium", "No Received headers",
                           "There is no relay path. These may not be the original headers, or the message was injected locally.",
                           "routing"))
 
@@ -326,7 +331,7 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
         F.append(_finding("dmarc-policy-none", "info", "Sender's DMARC policy is p=none",
                           f"{from_domain} only monitors spoofing; it does not ask receivers to block it.", "authentication"))
     if dmarc["result"] in ("none", "unknown", "bestguesspass") and items and from_domain:
-        F.append(_finding("dmarc-missing", "low", "No DMARC verdict",
+        F.append(_finding("dmarc-missing", "info" if no_transport else "low", "No DMARC verdict",
                           f"No DMARC result was recorded for {from_domain}; the sender may not publish a DMARC policy.",
                           "authentication"))
 
@@ -363,7 +368,7 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
                           "the ARC seal shows authentication passed before the list changed it." if list_broke_it else
                           "A DKIM signature was present but did not verify — the message may have been altered.", "authentication"))
     elif dkim_result == "none" and items:
-        F.append(_finding("dkim-none", "low", "Message is not DKIM-signed", "", "authentication"))
+        F.append(_finding("dkim-none", "info" if no_transport else "low", "Message is not DKIM-signed", "", "authentication"))
     if dkim_result == "unverified":
         F.append(_finding("dkim-unverified", "info", "DKIM signature present but no verification result",
                           "No Authentication-Results header from the receiving server was included.", "authentication"))
@@ -489,6 +494,13 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
     if items and not summary["to"] and not hmap.get("to"):
         F.append(_finding("no-recipients", "low", "No To recipients", "Recipients were hidden (Bcc / undisclosed).", "message"))
     F.extend(_header_checks(hmap, summary, dmarc, dkim_sigs, spam, esp_info, from_domain, bool(items)))
+    if source and source.get("format") == "msg":
+        if not source.get("transport_headers"):
+            F.append(_finding("msg-no-transport", "info", "Outlook .msg without transport headers", source["notes"][0]
+                              if source.get("notes") else ""))
+        if any("compressed RTF" in n for n in source.get("notes", [])):
+            F.append(_finding("msg-rtf-body", "info", "Message body not readable",
+                              "Only compressed RTF is stored; links and forms in the body were not checked."))
 
     # routing findings
     skewed = [h for h in hops if h.clock_skew]
@@ -631,7 +643,8 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
         "stats": {"header_count": len(items), "hop_count": len(hops),
                   "findings": {s: sum(1 for f in F if f["severity"] == s) for s in order}},
         "meta": {"analyzed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                 "geoip": geo.database_info(), "scoring": cfg.describe()},
+                 "geoip": geo.database_info(), "scoring": cfg.describe(),
+                 "input": source or {"format": "eml" if from_file else "headers"}},
     }
     report["iocs"] = iocs.extract(report)
     return report

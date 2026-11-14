@@ -33,7 +33,7 @@ PYODIDE_SHA256 = "ab08aafc11a3c9a0fe73825eb2cec78bda9464348dd17414e7ec0132ef3451
 PYODIDE_FILES = ("pyodide.js", "pyodide.asm.js", "pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json")
 
 # Runtime dependencies of esha.core (geo uses maxminddb's pure-Python reader).
-PY_DEPS = ("publicsuffixlist", "dateutil", "maxminddb")
+PY_DEPS = ("publicsuffixlist", "dateutil", "maxminddb", "olefile")
 # Dependencies of those that only some versions need; bundled when installed.
 PY_DEPS_OPTIONAL = ("six", "tzdata")
 SKIP_SUFFIXES = (".so", ".pyd", ".dylib", ".pyc", ".pyi")

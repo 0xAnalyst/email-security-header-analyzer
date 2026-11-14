@@ -10,7 +10,7 @@ can take depending on context (for example when DMARC passes).
 | ESHA-001 | DMARC passed | pass | 0 | authentication | – |
 | ESHA-002 | DMARC failed | high | 25 | authentication | [T1672](https://attack.mitre.org/techniques/T1672/), [T1656](https://attack.mitre.org/techniques/T1656/) |
 | ESHA-003 | Sender's DMARC policy is p=none | info | 0 | authentication | – |
-| ESHA-004 | No DMARC verdict | low | 4 | authentication | – |
+| ESHA-004 | No DMARC verdict | low (info) | 4 | authentication | – |
 | ESHA-005 | SPF passed and aligned | pass | 0 | authentication | – |
 | ESHA-006 | SPF passed for a different domain | medium (info) | 12 | authentication | [T1672](https://attack.mitre.org/techniques/T1672/), [T1656](https://attack.mitre.org/techniques/T1656/) |
 | ESHA-007 | SPF failed | high | 25 | authentication | [T1672](https://attack.mitre.org/techniques/T1672/), [T1656](https://attack.mitre.org/techniques/T1656/) |
@@ -19,7 +19,7 @@ can take depending on context (for example when DMARC passes).
 | ESHA-010 | DKIM signature valid and aligned | pass | 0 | authentication | – |
 | ESHA-011 | DKIM signed by a different domain | medium (info) | 12 | authentication | [T1672](https://attack.mitre.org/techniques/T1672/), [T1656](https://attack.mitre.org/techniques/T1656/) |
 | ESHA-012 | DKIM failed | medium (info) | 12 | authentication | – |
-| ESHA-013 | Message is not DKIM-signed | low | 4 | authentication | – |
+| ESHA-013 | Message is not DKIM-signed | low (info) | 4 | authentication | – |
 | ESHA-014 | DKIM signature present but no verification result | info | 0 | authentication | – |
 | ESHA-015 | Microsoft composite authentication failed | high (medium) | 25 | authentication | [T1672](https://attack.mitre.org/techniques/T1672/), [T1656](https://attack.mitre.org/techniques/T1656/) |
 | ESHA-016 | ARC chain is broken | medium | 12 | authentication | – |
@@ -41,7 +41,7 @@ can take depending on context (for example when DMARC passes).
 | ESHA-109 | Return-Path differs from From | info | 0 | identity | – |
 | ESHA-110 | Sender header differs from From | low (info) | 4 | identity | – |
 | ESHA-120 | Sent through an email service provider | info | 0 | identity | – |
-| ESHA-201 | No Received headers | medium | 12 | routing | – |
+| ESHA-201 | No Received headers | medium (info) | 12 | routing | – |
 | ESHA-202 | Sending server has no reverse DNS | low | 4 | routing | – |
 | ESHA-203 | Sent from a residential or dynamic IP | medium | 12 | routing | [T1586.002](https://attack.mitre.org/techniques/T1586/002/) |
 | ESHA-204 | Sending server greeted with a bare IP address | low | 4 | routing | – |
@@ -94,6 +94,8 @@ can take depending on context (for example when DMARC passes).
 | ESHA-503 | Bulk mail | low | 4 | spam | – |
 | ESHA-504 | Flagged as spam by SpamAssassin | medium | 12 | spam | – |
 | ESHA-900 | No headers found | info | 0 | input | – |
+| ESHA-901 | Outlook .msg without transport headers | info | 0 | input | – |
+| ESHA-902 | Message body not readable | info | 0 | input | – |
 
 ## Details
 
@@ -528,4 +530,16 @@ SpamAssassin's score exceeded its threshold.
 ### ESHA-900: No headers found
 
 The input did not contain any recognisable email headers.
+
+### ESHA-901: Outlook .msg without transport headers
+
+The .msg file has no original internet headers, usually because it was saved from Sent Items or Drafts. There is no relay route or authentication result to check.
+
+**What to do:** Ask for the message from the recipient's Inbox, or for the original as an .eml attachment.
+
+### ESHA-902: Message body not readable
+
+The .msg body is stored only as compressed RTF, which ESHA does not decode, so links and forms in the body were not checked.
+
+**What to do:** Save the message as .eml (or forward it as an attachment) to check the body.
 

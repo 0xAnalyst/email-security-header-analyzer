@@ -277,5 +277,5 @@ def test_fake_list_id_does_not_soften_reply_to_on_spoofed_mail():
 
 def test_web_samples_match_test_samples():
     web = Path(__file__).parent.parent / "esha" / "static" / "samples"
-    for f in web.glob("*.eml"):
+    for f in list(web.glob("*.eml")) + list(web.glob("*.msg")):
         assert f.read_bytes() == (SAMPLES / f.name).read_bytes(), f"{f.name} differs from tests/samples"

@@ -2,4 +2,5 @@ Flask>=3.0,<4
 maxminddb>=2.2,<4
 python-dateutil>=2.9
 publicsuffixlist>=1.0
+olefile>=0.46
 gunicorn>=22.0; platform_system != "Windows"

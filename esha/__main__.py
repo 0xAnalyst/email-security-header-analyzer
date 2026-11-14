@@ -63,14 +63,19 @@ def _serve(args):
 
 def _analyze(args):
     from .core import analyze
+    source = None
     if args.file == "-":
         text, from_file = sys.stdin.read(), False
     else:
         with open(args.file, "rb") as fh:
             data = fh.read()
-        text = data.decode("utf-8", "replace")
-        from_file = args.file.lower().endswith((".eml", ".msg", ".mbox"))
-    report = analyze(text, from_file=from_file)
+        from .core.inputs import MsgError, decode_bytes
+        try:
+            text, from_file, source = decode_bytes(data, args.file)
+        except MsgError as e:
+            print(f"Could not read {args.file}: {e}", file=sys.stderr)
+            return 1
+    report = analyze(text, from_file=from_file, source=source)
     fmt = "json" if args.json else args.format
     if args.output and fmt == "text":
         fmt = "json"  # -o without -f writes the JSON report
@@ -158,7 +163,7 @@ def main(argv=None):
         target.add_argument("-d", "--debug", action="store_true")
         target.add_argument("--open", action="store_true", help="open the browser")
     ap = sub.add_parser("analyze", help="analyze an .eml / header file from the command line")
-    ap.add_argument("file", help="path to .eml or text file, or - for stdin")
+    ap.add_argument("file", help="path to an .eml, .msg or text file, or - for stdin")
     ap.add_argument("--json", action="store_true", help="print the full JSON report (same as --format json)")
     ap.add_argument("-f", "--format", default="text", choices=["text", "json", "iocs", "csv", "stix", "misp", "html"],
                     help="output format: text (default), json, iocs, csv, stix, misp or html")

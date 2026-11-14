@@ -16,6 +16,7 @@ import base64
 import io
 import struct
 import zipfile
+from datetime import datetime, timezone
 from email.mime.application import MIMEApplication
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
@@ -126,6 +127,181 @@ def zip_bytes(files: dict[str, bytes], encrypt=False) -> bytes:
             data[i + 8] |= 0x01
             i += 4
     return bytes(data)
+
+
+# ============================================================ Outlook .msg
+# A minimal Compound File Binary (MS-CFB v3) writer and an MS-OXMSG message
+# builder, enough to make synthetic .msg fixtures without Outlook.
+_FREE, _END, _FATSECT, _NOSTREAM = 0xFFFFFFFF, 0xFFFFFFFE, 0xFFFFFFFD, 0xFFFFFFFF
+
+
+def write_cfb(tree: dict) -> bytes:
+    """``tree`` maps names to bytes (streams) or dicts (storages)."""
+    entries = [{"name": "Root Entry", "type": 5, "children": [], "data": b""}]
+
+    def add(node, parent):
+        for name, value in node.items():
+            idx = len(entries)
+            if isinstance(value, dict):
+                entries.append({"name": name, "type": 1, "children": [], "data": b""})
+                entries[parent]["children"].append(idx)
+                add(value, idx)
+            else:
+                entries.append({"name": name, "type": 2, "children": [], "data": bytes(value)})
+                entries[parent]["children"].append(idx)
+    add(tree, 0)
+
+    mini = bytearray()
+    minifat: list[int] = []
+    large: list[tuple[int, bytes]] = []
+    for i, e in enumerate(entries):
+        e.update(start=_END, size=len(e["data"]))
+        if e["type"] != 2 or not e["data"]:
+            continue
+        if len(e["data"]) < 4096:
+            first = len(minifat)
+            n = -(-len(e["data"]) // 64)
+            e["start"] = first
+            minifat += [first + k + 1 for k in range(n - 1)] + [_END]
+            mini += e["data"] + b"\x00" * (n * 64 - len(e["data"]))
+        else:
+            large.append((i, e["data"]))
+    n_minifat = -(-len(minifat) * 4 // 512)
+    n_dir = -(-len(entries) // 4)
+    n_ministream = -(-len(mini) // 512)
+    n_large = sum(-(-len(d) // 512) for _, d in large)
+    data_sectors = n_minifat + n_dir + n_ministream + n_large
+    n_fat = 1
+    while (data_sectors + n_fat) > n_fat * 128:
+        n_fat += 1
+    fat = [_FATSECT] * n_fat
+    sector = n_fat
+
+    def chain(count):
+        nonlocal sector
+        start = sector
+        fat.extend(list(range(start + 1, start + count)) + [_END])
+        sector += count
+        return start
+    minifat_start = chain(n_minifat) if n_minifat else _END
+    dir_start = chain(n_dir)
+    entries[0]["start"] = chain(n_ministream) if n_ministream else _END
+    entries[0]["size"] = len(minifat) * 64
+    for i, d in large:
+        entries[i]["start"] = chain(-(-len(d) // 512))
+    fat += [_FREE] * (n_fat * 128 - len(fat))
+
+    def key(i):
+        n = entries[i]["name"]
+        return (len(n), n.upper())
+
+    def link(ids):  # balanced sibling tree, sorted as MS-CFB requires
+        if not ids:
+            return _NOSTREAM
+        ids = sorted(ids, key=key)
+        mid = len(ids) // 2
+        entries[ids[mid]]["left"] = link(ids[:mid])
+        entries[ids[mid]]["right"] = link(ids[mid + 1:])
+        return ids[mid]
+    for e in entries:
+        e.setdefault("left", _NOSTREAM)
+        e.setdefault("right", _NOSTREAM)
+    for e in entries:
+        e["child"] = link(e["children"]) if e["type"] in (1, 5) else _NOSTREAM
+
+    dir_bytes = bytearray()
+    for e in entries:
+        name = e["name"].encode("utf-16-le")
+        dir_bytes += (name + b"\x00" * (64 - len(name))) + struct.pack(
+            "<HBBIII16sIQQIQ", len(name) + 2, e["type"], 1, e["left"], e["right"], e["child"], b"\x00" * 16, 0, 0, 0,
+            e["start"], e["size"])
+    while len(dir_bytes) < n_dir * 512:
+        dir_bytes += b"\x00" * 64 + struct.pack("<HBBIII16sIQQIQ", 0, 0, 0, _NOSTREAM, _NOSTREAM, _NOSTREAM,
+                                                  b"\x00" * 16, 0, 0, 0, 0, 0)
+    difat = list(range(n_fat)) + [_FREE] * (109 - n_fat)
+    header = (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 16
+              + struct.pack("<HHHHH6sIIIIIIIII", 0x3E, 3, 0xFFFE, 9, 6, b"\x00" * 6, 0, n_fat, dir_start, 0, 4096,
+                            minifat_start, n_minifat, _END, 0)
+              + struct.pack("<109I", *difat))
+    body = struct.pack(f"<{len(fat)}I", *fat)
+    body += struct.pack(f"<{len(minifat)}I", *minifat) + b"\xff" * (n_minifat * 512 - len(minifat) * 4)
+    body += bytes(dir_bytes)
+    body += bytes(mini) + b"\x00" * (n_ministream * 512 - len(mini))
+    for _, d in large:
+        body += d + b"\x00" * (-(-len(d) // 512) * 512 - len(d))
+    return header + body
+
+
+def _u(text: str) -> bytes:
+    return text.encode("utf-16-le")
+
+
+def _props(header: bytes, fixed: dict[int, int]) -> bytes:
+    return header + b"".join(struct.pack("<IIQ", tag, 6, value) for tag, value in fixed.items())
+
+
+def build_msg(*, subject, sender_name, sender_email, to, transport_headers=None, text=None, html=None,
+              attachments=(), message_id=None, submit=None, embedded=False) -> dict:
+    """An MS-OXMSG storage tree. ``attachments``: (filename, mime, bytes) or (filename, dict) for an embedded message."""
+    filetime = int((submit - datetime(1601, 1, 1, tzinfo=timezone.utc)).total_seconds() * 10_000_000) if submit else 0
+    header = b"\x00" * 24 if embedded else (b"\x00" * 8 + struct.pack("<IIII", 1, len(attachments), 1, len(attachments)) + b"\x00" * 8)
+    t: dict = {
+        "__substg1.0_001A001F": _u("IPM.Note"), "__substg1.0_0037001F": _u(subject),
+        "__substg1.0_0C1A001F": _u(sender_name), "__substg1.0_0C1F001F": _u(sender_email),
+        "__substg1.0_0042001F": _u(sender_name), "__substg1.0_5D01001F": _u(sender_email),
+        "__substg1.0_0E04001F": _u(to),
+        "__properties_version1.0": _props(header, {0x00390040: filetime} if filetime else {}),
+        "__recip_version1.0_#00000000": {
+            "__properties_version1.0": _props(b"\x00" * 8, {0x0C150003: 1}),
+            "__substg1.0_3001001F": _u(to), "__substg1.0_39FE001F": _u(to), "__substg1.0_3003001F": _u(to)},
+    }
+    if not embedded:
+        t["__nameid_version1.0"] = {"__substg1.0_00020102": b"", "__substg1.0_00030102": b"", "__substg1.0_00040102": b""}
+    if transport_headers:
+        t["__substg1.0_007D001F"] = _u(transport_headers)
+    if message_id:
+        t["__substg1.0_1035001F"] = _u(message_id)
+    if text:
+        t["__substg1.0_1000001F"] = _u(text)
+    if html:
+        t["__substg1.0_10130102"] = html.encode("utf-8")
+    for n, att in enumerate(attachments):
+        if isinstance(att[1], dict):
+            fname, inner = att
+            t[f"__attach_version1.0_#{n:08X}"] = {
+                "__properties_version1.0": _props(b"\x00" * 8, {0x37050003: 5}),
+                "__substg1.0_3707001F": _u(fname), "__substg1.0_3001001F": _u(fname), "__substg1.0_3701000D": inner}
+        else:
+            fname, mime, data = att
+            t[f"__attach_version1.0_#{n:08X}"] = {
+                "__properties_version1.0": _props(b"\x00" * 8, {0x37050003: 1}),
+                "__substg1.0_3707001F": _u(fname), "__substg1.0_3704001F": _u(fname[:12]),
+                "__substg1.0_370E001F": _u(mime), "__substg1.0_37010102": data}
+    return t
+
+
+def outlook_samples():
+    eml = (OUT / "phish_paypal.eml").read_text()
+    head, _, body = eml.partition("\n\n")
+    form = ('<html><body><h2>PayPal account verification</h2><form action="https://paypa1-security.com/verify" method="post">'
+            '<input name="email"><input type="password" name="pw"><button>Verify</button></form></body></html>')
+    tree = build_msg(subject="Urgent: Your account has been suspended", sender_name="service@paypal.com",
+                     sender_email="service@paypa1-security.com", to="victim@example.com", transport_headers=head + "\n",
+                     html=body.strip(), text="Your account has been suspended. Verify your account to restore access.",
+                     attachments=[("Account_Verification.html", "text/html", form.encode())],
+                     submit=datetime(2026, 11, 11, 12, 10, tzinfo=timezone.utc))
+    (OUT / "outlook_phish.msg").write_bytes(write_cfb(tree))
+    print("wrote tests/samples/outlook_phish.msg")
+    inner = build_msg(subject="Q3 figures (draft)", sender_name="Priya Raman", sender_email="priya.raman@example.com",
+                      to="analyst@example.com", text="Draft figures attached to the original thread.", embedded=True,
+                      submit=datetime(2026, 11, 12, 9, 0, tzinfo=timezone.utc))
+    z = zip_bytes({"Q3_report.pdf": b"%PDF-1.7\n% ESHA inert test fixture\n"})
+    sent = build_msg(subject="Q3 report", sender_name="Analyst", sender_email="analyst@example.com",
+                     to="priya.raman@example.com", text="Hi Priya,\n\nThe Q3 report is attached.\n\nThanks",
+                     attachments=[("Q3_report.zip", "application/zip", z), ("Q3 figures (draft).msg", inner)],
+                     message_id="<sent.20261113.0915@example.com>", submit=datetime(2026, 11, 13, 9, 15, tzinfo=timezone.utc))
+    (OUT / "outlook_sent_item.msg").write_bytes(write_cfb(sent))
+    print("wrote tests/samples/outlook_sent_item.msg")
 
 
 # ===================================================================== attacks
@@ -517,7 +693,7 @@ def main():
     FP.mkdir(parents=True, exist_ok=True)
     for fn in (html_smuggling, archive_payloads, iso_lnk, calendar_phish, quishing, dkim_bimi_spoof, thread_hijack,
                bulk_no_unsubscribe, fp_mailchimp, fp_sendgrid_receipt, fp_ses_reset, fp_mailgun, fp_sfmc, fp_m365_internal,
-               fp_google_calendar, fp_mailing_list, fp_zip_attachment, fp_google_groups):
+               fp_google_calendar, fp_mailing_list, fp_zip_attachment, fp_google_groups, outlook_samples):
         fn()
 
 

@@ -230,7 +230,10 @@ def test_samples_are_reproducible(tmp_path, monkeypatch):
     monkeypatch.setattr(make_samples, "FP", tmp_path / "fp")
     (tmp_path / "files").mkdir()
     (tmp_path / "files" / "invoice_fixture.iso").write_bytes((SAMPLES / "files" / "invoice_fixture.iso").read_bytes())
+    (tmp_path / "phish_paypal.eml").write_bytes((SAMPLES / "phish_paypal.eml").read_bytes())  # source for the .msg
     monkeypatch.setattr(make_samples, "ROOT", tmp_path)
     make_samples.main()
-    for f in sorted(tmp_path.rglob("*.eml")):
-        assert f.read_text() == (SAMPLES / f.relative_to(tmp_path)).read_text(), f.name
+    generated = sorted(tmp_path.rglob("*.eml")) + sorted(tmp_path.glob("*.msg"))
+    assert len(generated) > 20
+    for f in generated:
+        assert f.read_bytes() == (SAMPLES / f.relative_to(tmp_path)).read_bytes(), f.name

@@ -9,18 +9,10 @@ from . import __version__
 from .core import analyze
 from .core.exports import FORMATS, ExportError, export
 from .core.geo import database_info
+from .core.inputs import MsgError, decode_bytes
 from .core.scoring import get_config
 
 MAX_UPLOAD = int(os.environ.get("ESHA_MAX_UPLOAD_MB", "10")) * 1024 * 1024
-
-
-def _decode(data: bytes) -> str:
-    for enc in ("utf-8", "latin-1"):
-        try:
-            return data.decode(enc)
-        except UnicodeDecodeError:
-            continue
-    return data.decode("utf-8", "replace")
 
 
 def create_app() -> Flask:
@@ -47,23 +39,28 @@ def create_app() -> Flask:
 
     @app.post("/api/analyze")
     def api_analyze():
-        """Accepts JSON {"headers": "..."}, form field ``headers``, a file
-        upload named ``file`` (.eml/.txt), or a raw text/plain or message/rfc822 body."""
-        text, from_file = None, False
+        """Accepts JSON {"headers": "..."}, form field ``headers``, a file upload named
+        ``file`` (.eml, .msg, .txt), or a raw text/plain, message/rfc822 or
+        application/vnd.ms-outlook body."""
+        text, from_file, source = None, False, None
         upload = request.files.get("file")
-        if upload and upload.filename:
-            text = _decode(upload.read())
-            from_file = upload.filename.lower().endswith((".eml", ".mbox"))
-        elif request.is_json:
-            body = request.get_json(silent=True) or {}
-            text = body.get("headers")
-        elif request.form.get("headers"):
-            text = request.form["headers"]
-        elif request.mimetype in ("text/plain", "message/rfc822"):
-            text, from_file = _decode(request.get_data()), request.mimetype == "message/rfc822"
+        try:
+            if upload and upload.filename:
+                text, from_file, source = decode_bytes(upload.read(), upload.filename)
+            elif request.mimetype in ("application/vnd.ms-outlook", "application/octet-stream"):
+                text, from_file, source = decode_bytes(request.get_data(), "upload.msg")
+        except MsgError as e:
+            return jsonify(error=str(e)), 400
+        if text is None:
+            if request.is_json:
+                text = (request.get_json(silent=True) or {}).get("headers")
+            elif request.form.get("headers"):
+                text = request.form["headers"]
+            elif request.mimetype in ("text/plain", "message/rfc822"):
+                text, from_file, source = decode_bytes(request.get_data(), rfc822=request.mimetype == "message/rfc822")
         if not text or not str(text).strip():
-            return jsonify(error="No headers supplied. Paste headers or upload an .eml file."), 400
-        report = analyze(str(text), from_file=from_file)
+            return jsonify(error="No headers supplied. Paste headers or upload an .eml or .msg file."), 400
+        report = analyze(str(text), from_file=from_file, source=source)
         fmt = request.args.get("format")
         if fmt and fmt != "json":
             return _file(report, fmt)

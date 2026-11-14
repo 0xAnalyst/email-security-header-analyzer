@@ -8,24 +8,22 @@ importScripts(base + "pyodide/pyodide.js");
 
 var ready = (async function () {
   var py = await loadPyodide({ indexURL: base + "pyodide/" });
-  var resp = await fetch(base + "py/esha-bundle.zip");
+  var resp = await fetch(base + "py/esha-bundle.zip" + self.location.search);  // ?v=<version> busts caches
   if (!resp.ok) throw new Error("Could not load the analysis engine (" + resp.status + ").");
   py.unpackArchive(await resp.arrayBuffer(), "zip", { extractDir: "/esha_lib" });
   py.runPython([
     "import sys, json",
     "sys.path.insert(0, '/esha_lib')",
     "from esha.core import analyze as _analyze",
-    "def _decode(data):",
-    "    for enc in ('utf-8', 'latin-1'):",
-    "        try:",
-    "            return data.decode(enc)",
-    "        except UnicodeDecodeError:",
-    "            pass",
-    "    return data.decode('utf-8', 'replace')",
-    "def esha_run(text, data, from_file):",
+    "from esha.core.inputs import MsgError, decode_bytes",
+    "def esha_run(text, data, name):",
+    "    source, from_file = None, False",
     "    if data is not None:",
-    "        text = _decode(bytes(data.to_py()))",
-    "    return json.dumps(_analyze(text, from_file=bool(from_file)), default=str)",
+    "        try:",
+    "            text, from_file, source = decode_bytes(bytes(data.to_py()), name or '')",
+    "        except MsgError as e:",
+    "            raise ValueError(str(e)) from None",
+    "    return json.dumps(_analyze(text, from_file=bool(from_file), source=source), default=str)",
     "def esha_export(report_json, fmt):",
     "    from esha.core.exports import export",
     "    return json.dumps(list(export(json.loads(report_json), fmt)))",
@@ -48,7 +46,7 @@ self.onmessage = async function (e) {
     var run = py.globals.get("esha_run");
     // undefined (not null) maps to Python None; Pyodide turns null into a JsNull object.
     var data = msg.bytes ? new Uint8Array(msg.bytes) : undefined;
-    var out = run(msg.text || "", data, !!msg.fromFile);
+    var out = run(msg.text || "", data, msg.name || "");
     run.destroy();
     self.postMessage({ id: msg.id, ok: true, result: JSON.parse(out) });
   } catch (err) {
