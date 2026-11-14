@@ -26,6 +26,9 @@ var ready = (async function () {
     "    if data is not None:",
     "        text = _decode(bytes(data.to_py()))",
     "    return json.dumps(_analyze(text, from_file=bool(from_file)), default=str)",
+    "def esha_export(report_json, fmt):",
+    "    from esha.core.exports import export",
+    "    return json.dumps(list(export(json.loads(report_json), fmt)))",
   ].join("\n"));
   return py;
 })();
@@ -35,6 +38,13 @@ self.onmessage = async function (e) {
   try {
     var py = await ready;
     if (msg.type === "warmup") { self.postMessage({ id: msg.id, ok: true, result: null }); return; }
+    if (msg.type === "export") {
+      var exp = py.globals.get("esha_export");
+      var res = JSON.parse(exp(msg.report, msg.format));
+      exp.destroy();
+      self.postMessage({ id: msg.id, ok: true, result: { content: res[0], type: res[1], name: res[2] } });
+      return;
+    }
     var run = py.globals.get("esha_run");
     // undefined (not null) maps to Python None; Pyodide turns null into a JsNull object.
     var data = msg.bytes ? new Uint8Array(msg.bytes) : undefined;

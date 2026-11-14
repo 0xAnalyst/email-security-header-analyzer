@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from email.parser import HeaderParser
 
 from . import auth as A
-from . import esp, geo
+from . import esp, geo, iocs
 from .body import analyze_body
 from .domains import (
     FREE_MAIL,
@@ -617,7 +617,7 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
     headers = [{"name": k, "value": decode_mime(v) if k.lower() in ("subject", "from", "to", "cc", "reply-to", "sender") else v,
                 "category": _category(k)} for k, v in items]
 
-    return {
+    report = {
         "summary": summary,
         "hops": hop_dicts,
         "timing": timing,
@@ -633,6 +633,8 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
         "meta": {"analyzed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                  "geoip": geo.database_info(), "scoring": cfg.describe()},
     }
+    report["iocs"] = iocs.extract(report)
+    return report
 
 
 REPLY_PREFIX = re.compile(r"^\s*(?:\[[^\]]{1,40}\]\s*)?(?:re|aw|sv|vs|antw|odp|rif|res|ynt)\s*(?:\[\d+\]|\(\d+\))?\s*[:\uff1a]",

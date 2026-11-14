@@ -6,6 +6,7 @@
   var form = $("#form"), ta = $("#headers"), drop = $("#drop"), fileIn = $("#file");
   var intake = $("#intake"), report = $("#report"), errBox = $("#error");
   var btnAnalyze = $("#btn-analyze"), btnNew = $("#btn-new"), btnExport = $("#btn-export"), btnCopy = $("#btn-copy");
+  var btnHtml = $("#btn-html");
   var last = null;
 
   function h(tag, attrs) {
@@ -182,16 +183,32 @@
 
   btnNew.addEventListener("click", function () {
     report.hidden = true; intake.hidden = false;
-    [btnNew, btnExport, btnCopy].forEach(function (b) { b.hidden = true; });
+    [btnNew, btnExport, btnCopy, btnHtml].forEach(function (b) { b.hidden = true; });
     history.replaceState(null, "", location.pathname);
     ta.focus(); ta.select();
   });
-  btnExport.addEventListener("click", function () {
+  /* Exports are produced by the Python engine (server or in-browser), so every
+     channel (UI, API, CLI, GitHub Pages) writes identical files. */
+  function exportAs(fmt) {
     if (!last) return;
-    var blob = new Blob([JSON.stringify(last, null, 2)], { type: "application/json" });
-    var a = h("a", { href: URL.createObjectURL(blob), download: "esha-report-" + (last.meta.analyzed_at || "").replace(/[:]/g, "") + ".json" });
-    document.body.append(a); a.click(); a.remove();
-  });
+    var job = ENGINE === "browser"
+      ? callWorker({ type: "export", report: JSON.stringify(last), format: fmt })
+      : fetch("api/export", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ report: last, format: fmt }) }).then(function (r) {
+          if (!r.ok) return r.json().then(function (j) { throw new Error(j.error || "Export failed."); });
+          var cd = r.headers.get("Content-Disposition") || "", m = /filename="([^"]+)"/.exec(cd);
+          return r.text().then(function (t) { return { content: t, type: r.headers.get("Content-Type") || "", name: m ? m[1] : "esha-export" }; });
+        });
+    return job.then(function (f) {
+      var blob = new Blob([f.content], { type: (f.type || "application/octet-stream").split(";")[0] });
+      var a = h("a", { href: URL.createObjectURL(blob), download: f.name });
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+      toast("Downloaded " + f.name);
+    }).catch(function (e) { toast(e.message || "Export failed."); });
+  }
+  btnExport.addEventListener("click", function () { exportAs("json"); });
+  btnHtml.addEventListener("click", function () { exportAs("html"); });
   btnCopy.addEventListener("click", function () {
     if (!last) return;
     var r = last, sm = r.summary, a = r.auth, lines = [
@@ -490,6 +507,57 @@
   }
   function fmtSize(n) { return n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(1) + " MB"; }
 
+  function indicatorsSection(r) {
+    var x = r.iocs;
+    if (!x) return null;
+    var defanged = true, tables = h("div");
+    function val(o) { return defanged && o.defanged ? o.defanged : o.value; }
+    function sus(flag) { return flag ? h("span", { class: "tag flag-tag", text: "suspicious" }) : null; }
+    function table(title, head, rows) {
+      if (!rows.length) return null;
+      var tb = h("tbody");
+      rows.forEach(function (cells) { tb.append(h("tr", {}, cells.map(function (c) { return h("td", typeof c === "string" ? { text: c } : {}, typeof c === "string" ? null : c); }))); });
+      return h("div", { class: "ioc-block" }, h("h3", { class: "sub-title", text: title + " (" + rows.length + ")" }),
+        h("table", { class: "ioc-table" }, h("thead", {}, h("tr", {}, head.map(function (t) { return h("th", { text: t }); }))), tb));
+    }
+    function draw() {
+      tables.replaceChildren();
+      [table("IP addresses", ["Value", "Role", "Country", ""], x.ips.map(function (o) { return [h("span", { class: "mono", text: val(o) }), o.roles.join(", "), o.country || "", sus(o.suspicious)]; })),
+       table("Domains", ["Value", "Role", ""], x.domains.map(function (o) { return [h("span", { class: "mono", text: val(o) }), o.roles.join(", "), sus(o.suspicious)]; })),
+       table("URLs", ["Value", "Source", ""], x.urls.map(function (o) { return [h("span", { class: "mono", text: val(o) }), o.source, sus(o.suspicious)]; })),
+       table("Email addresses", ["Value", "Role"], x.emails.map(function (o) { return [h("span", { class: "mono", text: val(o) }), o.roles.join(", ")]; })),
+       table("Attachments", ["File", "SHA-256", "MD5", ""], x.files.map(function (o) {
+         return [o.filename, h("span", { class: "mono", text: o.sha256 || "" }), h("span", { class: "mono", text: o.md5 || "" }), sus(o.suspicious)]; })),
+      ].forEach(function (t) { if (t) tables.append(t); });
+      if (!tables.childNodes.length) tables.append(h("p", { class: "empty", text: "No indicators found." }));
+    }
+    var toggle = h("input", { type: "checkbox", id: "defang", checked: true });
+    toggle.addEventListener("change", function () { defanged = toggle.checked; draw(); });
+    function copyAll() {
+      var lines = [];
+      x.ips.forEach(function (o) { lines.push(val(o)); });
+      x.domains.forEach(function (o) { lines.push(val(o)); });
+      x.urls.forEach(function (o) { lines.push(val(o)); });
+      x.emails.forEach(function (o) { lines.push(val(o)); });
+      x.files.forEach(function (o) { if (o.sha256) lines.push(o.sha256); });
+      navigator.clipboard.writeText(lines.join("\n")).then(function () { toast(lines.length + " indicators copied"); }, function () { toast("Copy failed"); });
+    }
+    function btn(label, fmt) {
+      var b = h("button", { type: "button", class: "btn ghost small", text: label });
+      b.addEventListener("click", function () { exportAs(fmt); });
+      return b;
+    }
+    var copyBtn = h("button", { type: "button", class: "btn ghost small", text: "Copy all" });
+    copyBtn.addEventListener("click", copyAll);
+    draw();
+    return h("section", { class: "block", "aria-labelledby": "i-t" }, h("h2", { class: "section-title", id: "i-t", text: "Indicators" }),
+      h("p", { class: "section-note", text: "Indicators from the sender, links and attachments. Recipients and your own mail servers are left out." }),
+      h("div", { class: "ioc-tools" },
+        h("label", { class: "check" }, toggle, " Defang (hxxp, [.])"), copyBtn,
+        h("span", { class: "ioc-export" }, "Export: ", btn("CSV", "csv"), btn("JSON", "iocs"), btn("STIX 2.1", "stix"), btn("MISP event", "misp"))),
+      tables);
+  }
+
   function headersTable(r) {
     var cats = [["all", "All"], ["message", "Message"], ["routing", "Routing"], ["authentication", "Authentication"], ["spam", "Spam filter"], ["x-header", "X- headers"], ["other", "Other"]];
     var counts = { all: r.headers.length };
@@ -585,10 +653,15 @@
       defs.push({ id: "content", label: "Links & attachments",
         count: r.content.link_count + r.content.attachments.length, el: content });
     }
+    var ind = indicatorsSection(r);
+    if (ind) {
+      var n = r.iocs.counts;
+      defs.push({ id: "iocs", label: "Indicators", count: n.ips + n.domains + n.urls + n.emails + n.files, el: ind });
+    }
     defs.push({ id: "headers", label: "All headers", count: r.stats.header_count, el: headersTable(r) });
     report.replaceChildren(verdict(r), tabs(defs));
     intake.hidden = true; report.hidden = false;
-    [btnNew, btnExport, btnCopy].forEach(function (b) { b.hidden = false; });
+    [btnNew, btnExport, btnCopy, btnHtml].forEach(function (b) { b.hidden = false; });
     window.scrollTo(0, 0);
     report.querySelector(".subject").setAttribute("tabindex", "-1");
     report.querySelector(".subject").focus({ preventScroll: true });

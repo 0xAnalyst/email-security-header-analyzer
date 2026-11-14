@@ -117,6 +117,20 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .file-btn:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 .samples { color: var(--ink-2); font-size: 15px; flex-basis: 100%; }
 .print-only { display: none; }
+.btn.small { font-size: 13.5px; padding: 7px 10px 5px; }
+.ioc-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 12px 0 4px; }
+.ioc-export { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--ink-2); font-size: 14.5px; }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: 14.5px; color: var(--ink-2); cursor: pointer; }
+.ioc-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ioc-table th, .ioc-table td { text-align: left; vertical-align: top; padding: 7px 12px 6px 0; border-top: 1px solid var(--rule); }
+.ioc-table th { font-weight: 600; color: var(--ink-3); font-size: 13px; border-top: 0; }
+.ioc-table td .mono { overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .ioc-table thead { display: none; }
+  .ioc-table, .ioc-table tbody, .ioc-table tr, .ioc-table td { display: block; }
+  .ioc-table tr { border-top: 1px solid var(--rule); padding: 6px 0; }
+  .ioc-table td { border: 0; padding: 1px 0; }
+}
 .error { color: var(--red); font-weight: 600; margin: 12px 0 0; }
 .howto { font-size: 15px; color: var(--ink-2); padding-top: 30px; }
 .howto h2 { font-size: 17px; color: var(--ink); margin: 0 0 10px; }
@@ -401,6 +415,7 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 }
 @media print {
   .print-only { display: block; }
+  .ioc-tools { display: none; }
   .tabpanel .section-title { margin-top: 20px; page-break-after: avoid; }
   .finding, .hop, .att-list li, tr { page-break-inside: avoid; }
   .f-more { display: none; }

@@ -71,10 +71,21 @@ def _analyze(args):
         text = data.decode("utf-8", "replace")
         from_file = args.file.lower().endswith((".eml", ".msg", ".mbox"))
     report = analyze(text, from_file=from_file)
-    if args.json:
-        json.dump(report, sys.stdout, indent=2, default=str)
-        print()
-        return 0
+    fmt = "json" if args.json else args.format
+    if args.output and fmt == "text":
+        fmt = "json"  # -o without -f writes the JSON report
+    if fmt != "text":
+        from .core.exports import export
+        content = export(report, fmt)[0]
+        if args.output:
+            with open(args.output, "w", encoding="utf-8", newline="") as fh:
+                fh.write(content)
+            print(f"Wrote {fmt} to {args.output} ({report['score']['label']}, {report['score']['value']}/100)", file=sys.stderr)
+        else:
+            sys.stdout.write(content if content.endswith("\n") else content + "\n")
+        if args.json:
+            return 0  # --json has always exited 0; kept for existing scripts
+        return 2 if report["score"]["level"] == "high" else 0
     color = sys.stdout.isatty() and not args.no_color
     c = (lambda k: SEV_COLOR.get(k, "")) if color else (lambda k: "")
     r = RESET if color else ""
@@ -148,7 +159,10 @@ def main(argv=None):
         target.add_argument("--open", action="store_true", help="open the browser")
     ap = sub.add_parser("analyze", help="analyze an .eml / header file from the command line")
     ap.add_argument("file", help="path to .eml or text file, or - for stdin")
-    ap.add_argument("--json", action="store_true", help="print the full JSON report")
+    ap.add_argument("--json", action="store_true", help="print the full JSON report (same as --format json)")
+    ap.add_argument("-f", "--format", default="text", choices=["text", "json", "iocs", "csv", "stix", "misp", "html"],
+                    help="output format: text (default), json, iocs, csv, stix, misp or html")
+    ap.add_argument("-o", "--output", help="write to this file instead of standard output")
     ap.add_argument("--no-color", action="store_true")
     rp = sub.add_parser("rules", help="list detection rules")
     rp.add_argument("--json", action="store_true")

@@ -3,6 +3,7 @@ links, attachments and HTML forms. Nothing is fetched or executed."""
 from __future__ import annotations
 
 import email
+import hashlib
 import ipaddress
 import re
 from email import policy
@@ -233,6 +234,7 @@ def analyze_body(raw: str, from_domain: str = "") -> dict | None:
                 container = None
             attachments.append({
                 "filename": name, "content_type": ctype, "size": len(payload), "extension": ext,
+                "sha256": hashlib.sha256(payload).hexdigest(), "md5": hashlib.md5(payload, usedforsecurity=False).hexdigest(),  # identification only
                 "kind": kind, "risky": bool(kind in HIGH_RISK_KINDS or double or sniff == "Windows executable"),
                 "double_extension": double, "content_mismatch": sniff,
                 "container": container,

@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import os
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 
 from . import __version__
 from .core import analyze
+from .core.exports import FORMATS, ExportError, export
 from .core.geo import database_info
 from .core.scoring import get_config
 
@@ -62,7 +63,31 @@ def create_app() -> Flask:
             text, from_file = _decode(request.get_data()), request.mimetype == "message/rfc822"
         if not text or not str(text).strip():
             return jsonify(error="No headers supplied. Paste headers or upload an .eml file."), 400
-        return jsonify(analyze(str(text), from_file=from_file))
+        report = analyze(str(text), from_file=from_file)
+        fmt = request.args.get("format")
+        if fmt and fmt != "json":
+            return _file(report, fmt)
+        return jsonify(report)
+
+    def _file(report, fmt):
+        try:
+            content, media, name = export(report, fmt)
+        except ExportError as e:
+            return jsonify(error=str(e)), 400
+        resp = Response(content, mimetype=media.split(";")[0])
+        if ";" in media:
+            resp.headers["Content-Type"] = media + "; charset=utf-8"
+        resp.headers["Content-Disposition"] = f'attachment; filename="{name}"'
+        return resp
+
+    @app.post("/api/export")
+    def api_export():
+        """Convert a report (as returned by /api/analyze) to another format:
+        {"report": {...}, "format": "csv|iocs|stix|misp|html|json"}."""
+        body = request.get_json(silent=True) or {}
+        if body.get("format") not in FORMATS:
+            return jsonify(error=f"format must be one of {', '.join(FORMATS)}"), 400
+        return _file(body.get("report"), body["format"])
 
     @app.get("/api/health")
     def health():
