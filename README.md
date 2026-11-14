@@ -1,5 +1,17 @@
 # Email Security Header Analyzer (ESHA)
 
+**[Open ESHA in your browser →](https://0xanalyst.github.io/email-security-header-analyzer/)**
+
+> [!IMPORTANT]
+> **Your emails never leave your device.** The hosted version runs the whole analyzer inside your browser tab with WebAssembly. There is no ESHA server: the headers and `.eml` files you open are never uploaded, stored or shared, not even with GitHub or the ESHA project.
+>
+> - **No uploads:** analysis runs locally in a background worker in the page.
+> - **No third parties:** no CDNs, analytics, trackers, or DNS or reputation lookups.
+> - **Enforced by the browser:** the page's Content Security Policy (`connect-src 'self'`) blocks it from contacting any other server.
+> - **Verifiable:** open your browser's DevTools, go to Network, analyze a message, and you'll see no request carrying it.
+>
+> That makes it suitable for sensitive or confidential messages, such as phishing reports from colleagues or incident evidence.
+
 Paste an email's headers, or drop the whole `.eml` file, and ESHA tells you where the message really came from: whether SPF, DKIM and DMARC passed, which identities don't match the sender, and which signs of phishing or spoofing it shows. Analysis runs entirely on your machine and never contacts third-party services.
 
 Built for SOC analysts, incident responders and IT admins who triage suspicious email. ESHA started from the open-source [MHA (E-Mail Header Analyzer)](https://github.com/cyberdefenders/email-header-analyzer) by [@lnxg33k](https://github.com/lnxg33k), and its analysis engine, interface, API and command line have since been rewritten.
