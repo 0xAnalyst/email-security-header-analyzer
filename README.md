@@ -38,7 +38,7 @@ Every result is combined into a 0–100 risk score with a plain-language explana
 
 You need Python 3.9 or newer.
 
-**macOS**: double-click `Start ESHA.command` in Finder, or run `./run.sh` in Terminal.
+**macOS**: double-click `Start ESHA.command` in Finder, or run `./run.sh` in Terminal. If macOS says it can't verify the file, right-click it and choose **Open**. If port 8080 is busy (Burp Suite uses it by default), ESHA picks the next free port and prints it.
 
 **Linux**
 ```sh

@@ -20,8 +20,39 @@ SEV_COLOR = {"critical": "\033[1;97;41m", "high": "\033[1;31m", "medium": "\033[
 RESET = "\033[0m"
 
 
+def _port_free(host: str, port: int) -> bool:
+    import socket
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    with socket.socket(family, socket.SOCK_STREAM) as s:
+        try:
+            s.bind((host, port))
+            return True
+        except OSError:
+            return False
+
+
+def _free_port(host: str, port: int, explicit: bool) -> int | None:
+    """Return ``port`` if free; otherwise (unless the user chose it) the next free one."""
+    if _port_free(host, port):
+        return port
+    if explicit:
+        return None
+    for candidate in range(port + 1, port + 50):
+        if _port_free(host, candidate):
+            return candidate
+    return None
+
+
 def _serve(args):
     from .app import app
+    port = _free_port(args.bind, args.port, explicit=args.port_given)
+    if port is None:
+        print(f"Port {args.port} is already in use (Burp Suite and other proxies often use 8080).\n"
+              f"Stop that program or choose another port, e.g.:  python -m esha -p 9090", file=sys.stderr)
+        return 1
+    if port != args.port:
+        print(f"Port {args.port} is busy (often Burp Suite or another proxy); using {port} instead.")
+    args.port = port
     url = f"http://{'127.0.0.1' if args.bind in ('0.0.0.0', '::') else args.bind}:{args.port}"
     print(f"ESHA {__version__} running at {url}  (Ctrl+C to stop)")
     if args.open:
@@ -77,7 +108,7 @@ def main(argv=None):
     sp = sub.add_parser("serve", help="run the web UI (default)")
     for target in (sp, p):
         target.add_argument("-b", "--bind", default="127.0.0.1")
-        target.add_argument("-p", "--port", type=int, default=8080)
+        target.add_argument("-p", "--port", type=int, default=None, help="port (default 8080, or the next free one)")
         target.add_argument("-d", "--debug", action="store_true")
         target.add_argument("--open", action="store_true", help="open the browser")
     ap = sub.add_parser("analyze", help="analyze an .eml / header file from the command line")
@@ -85,6 +116,9 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true", help="print the full JSON report")
     ap.add_argument("--no-color", action="store_true")
     args = p.parse_args(argv)
+    args.port_given = args.port is not None
+    if args.port is None:
+        args.port = 8080
     if args.cmd == "analyze":
         return _analyze(args)
     return _serve(args)
