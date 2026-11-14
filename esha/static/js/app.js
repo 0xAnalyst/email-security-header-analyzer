@@ -82,7 +82,9 @@
   }
   function engineWorker() {
     if (worker) return worker;
-    worker = new Worker("static/js/worker.js");
+    // The version in the URL makes browsers fetch a fresh engine after each release.
+    var verMeta = document.querySelector('meta[name="esha-version"]');
+    worker = new Worker("static/js/worker.js?v=" + encodeURIComponent(verMeta ? verMeta.getAttribute("content") : ""));
     worker.onmessage = function (e) {
       var p = pending[e.data.id];
       if (!p) return;
@@ -119,7 +121,7 @@
       if (body instanceof Blob) {
         var name = body.name || "";
         return body.arrayBuffer().then(function (buf) {
-          return callWorker({ bytes: buf, fromFile: /\.(eml|mbox)$/i.test(name) }, [buf]);
+          return callWorker({ bytes: buf, name: name }, [buf]);
         });
       }
       return callWorker({ text: body });
@@ -147,8 +149,13 @@
   }
   function analyzeFile(file) {
     if (!file) return;
-    file.text().then(function (t) { ta.value = t.split(/\r?\n\r?\n/)[0]; });
-    analyze(file);
+    var isMsg = /\.msg$/i.test(file.name || "");
+    // .msg is binary; its headers are filled in from the report once it is analyzed.
+    if (isMsg) ta.value = "";
+    else file.text().then(function (t) { ta.value = t.split(/\r?\n\r?\n/)[0]; });
+    analyze(file).then(function () {
+      if (isMsg && last && last.headers) ta.value = last.headers.map(function (x) { return x.name + ": " + x.value; }).join("\n");
+    });
   }
 
   form.addEventListener("submit", function (e) {
@@ -174,10 +181,14 @@
   });
   document.querySelectorAll("[data-sample]").forEach(function (b) {
     b.addEventListener("click", function () {
-      // Samples are whole .eml files, so analyze them as a dropped file (headers and body).
+      // Samples are whole .eml/.msg files, so analyze them as a dropped file (headers and body).
       var name = b.getAttribute("data-sample");
-      fetch("static/samples/" + name).then(function (r) { return r.blob(); })
-        .then(function (blob) { analyzeFile(new File([blob], name, { type: "message/rfc822" })); });
+      fetch("static/samples/" + name)
+        .then(function (r) { if (!r.ok) throw new Error(); return r.blob(); })
+        .then(function (blob) {
+          analyzeFile(new File([blob], name, { type: /\.msg$/i.test(name) ? "application/vnd.ms-outlook" : "message/rfc822" }));
+        })
+        .catch(function () { showError("The sample could not be loaded. Check that ESHA is still running, then try again."); });
     });
   });
 

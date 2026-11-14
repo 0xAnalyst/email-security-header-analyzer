@@ -4,6 +4,28 @@ All notable changes to ESHA. The format follows [Keep a Changelog](https://keepa
 and versions follow [Semantic Versioning](https://semver.org/). The JSON report only gains fields within
 a major version; existing fields are never renamed or removed.
 
+## [1.2.0] - 2026-11-14
+
+### Added
+- **Outlook `.msg` files** in the web app, on the GitHub Pages site, through the API (file upload or an
+  `application/vnd.ms-outlook` body) and on the command line. The original transport headers, plain and
+  HTML bodies and attachments are rebuilt into a standard message, and embedded `.msg` attachments are
+  converted recursively. Uses `olefile` (pure Python, BSD) rather than `extract-msg`, which would add
+  about 20 packages, including compiled ones that can't run in the browser.
+- Two informational rules: `ESHA-901` for a `.msg` without transport headers (saved from Sent Items or
+  Drafts), and `ESHA-902` for a body stored only as RTF.
+- Attached emails (`message/rfc822`) are listed with the attachments.
+- `meta.input` records whether the input was pasted headers, an `.eml` or a `.msg`.
+- An Outlook `.msg` sample on the start page.
+
+### Changed
+- The start page leads with privacy: on the hosted site, a "runs entirely in your browser" badge and
+  wording that nothing is uploaded.
+- For a `.msg` without transport headers, a missing route, DMARC or DKIM result is reported as a note,
+  because those messages never passed through a receiving server.
+- Engine files are requested with the version in the URL, so a new release never mixes with a cached
+  older engine.
+
 ## [1.1.0] - 2026-11-14
 
 ### Added

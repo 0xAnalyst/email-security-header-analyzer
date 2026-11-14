@@ -119,8 +119,12 @@ section adds archive and disk-image listings and invite details. All content is 
 - Done: the IOC panel and export (CSV, JSON, STIX 2.1, MISP), attachment hashes, the HTML report and
   the print layout. All are exported by one Python module (`esha/core/exports.py`) shared by the UI,
   the API (`?format=`, `/api/export`), the CLI (`-f`, `-o`) and the in-browser engine.
-- Still to do: `.mbox` and batch mode, and `.msg` support (waiting on approval of the `extract-msg`
-  dependency).
+- `.msg` support was added in 1.2.0 with `olefile` instead of `extract-msg`. `extract-msg` would add
+  about 20 packages, including `cryptography` and `cffi` (around 10 MB of compiled code), which can't run
+  in the browser. `olefile` is 115 KB of pure Python and works everywhere, including GitHub Pages. The
+  sample `.msg` files are made by a small compound-file writer in `scripts/make_samples.py`. They pass
+  `olefile`'s strict checks, and `extract-msg` reads them correctly (checked once, outside the project).
+- Still to do: `.mbox` and batch mode.
 - `.msg` support through the optional `extract-msg` extra (**I'll ask first**, because it pulls in
   several packages). `.mbox` support through the stdlib `mailbox` module.
 - `python -m esha batch <folder|file.mbox> --csv out.csv --json out.jsonl` and

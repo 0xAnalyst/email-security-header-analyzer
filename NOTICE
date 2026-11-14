@@ -14,3 +14,11 @@ Third-party components:
 - Overpass and Overpass Mono fonts, SIL Open Font License 1.1
 - GeoLite2 data created by MaxMind, CC BY-SA 4.0, https://www.maxmind.com
 - Flag sprite images inherited from MHA
+
+Also distributed with the in-browser (GitHub Pages) build:
+- Pyodide, Mozilla Public License 2.0, https://pyodide.org
+- olefile, BSD 2-Clause License (Philippe Lagadec)
+- maxminddb, Apache License 2.0 (MaxMind)
+- publicsuffixlist and the Public Suffix List data, Mozilla Public License 2.0
+- python-dateutil, Apache License 2.0 / BSD 3-Clause License
+- six, MIT License; tzdata, Apache License 2.0

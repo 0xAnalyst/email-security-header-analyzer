@@ -12,7 +12,7 @@
 >
 > That makes it suitable for sensitive or confidential messages, such as phishing reports from colleagues or incident evidence.
 
-Paste an email's headers, or drop the whole `.eml` file, and ESHA tells you where the message really came from: whether SPF, DKIM and DMARC passed, which identities don't match the sender, and which signs of phishing or spoofing it shows. Analysis runs entirely on your machine and never contacts third-party services.
+Paste an email's headers, or drop the whole `.eml` or Outlook `.msg` file, and ESHA tells you where the message really came from: whether SPF, DKIM and DMARC passed, which identities don't match the sender, and which signs of phishing or spoofing it shows. Analysis runs entirely on your machine and never contacts third-party services.
 
 Built for SOC analysts, incident responders and IT admins who triage suspicious email. ESHA started from the open-source [MHA (E-Mail Header Analyzer)](https://github.com/cyberdefenders/email-header-analyzer) by [@lnxg33k](https://github.com/lnxg33k), and its analysis engine, interface, API and command line have since been rewritten.
 
@@ -52,6 +52,8 @@ Built for SOC analysts, incident responders and IT admins who triage suspicious 
 - Image-only messages and requests to scan a QR code (quishing). ESHA does not decode QR codes.
 - Remote images and tracking pixels (shown as a note)
 - Login and data-collection forms in the message or its attachments
+
+**Outlook `.msg` files**: received messages keep their original internet headers, so they're analyzed exactly like an `.eml`, attachments and embedded messages included. Messages saved from Sent Items or Drafts have no transport headers; ESHA rebuilds From, To, Subject and Date from Outlook's properties and says the route can't be checked. Bodies stored only as RTF aren't decoded.
 
 **Spam filters**: Microsoft 365 (SCL, BCL, SFV, CAT such as `SPOOF` or `PHSH`) and SpamAssassin verdicts.
 
@@ -109,6 +111,7 @@ The image runs gunicorn as a non-root user with a read-only filesystem and a hea
 
 ```sh
 python -m esha analyze message.eml            # colour report in the terminal
+python -m esha analyze message.msg            # Outlook .msg works the same way
 python -m esha analyze message.eml --json     # full JSON report
 pbpaste | python -m esha analyze -            # headers from the clipboard (macOS)
 ```
@@ -128,6 +131,8 @@ python -m esha analyze message.eml -f iocs                    # indicators as JS
 curl -s localhost:8080/api/analyze -H 'Content-Type: application/json' -d '{"headers": "..."}'
 curl -s localhost:8080/api/analyze -F file=@message.eml
 curl -s localhost:8080/api/analyze -H 'Content-Type: message/rfc822' --data-binary @message.eml
+curl -s localhost:8080/api/analyze -F file=@message.msg
+curl -s localhost:8080/api/analyze -H 'Content-Type: application/vnd.ms-outlook' --data-binary @message.msg
 curl -s localhost:8080/api/health
 
 # other formats: csv, iocs, stix, misp, html
@@ -182,7 +187,7 @@ The databases are saved to `esha/static/data`. To keep them elsewhere, use `--de
 
 ```sh
 pip install -r requirements-dev.txt
-pytest            # 138 tests, including attack samples and a false-positive corpus in tests/samples
+pytest            # 149 tests, including attack samples and a false-positive corpus in tests/samples
 ruff check esha tests
 ```
 
@@ -199,6 +204,7 @@ Project layout:
 | `esha/core/rules.py` | Detection rule registry (IDs, ATT&CK, advice) |
 | `esha/core/scoring.py` | Score weights and thresholds (`esha.json`, `ESHA_WEIGHTS`) |
 | `esha/core/iocs.py` | Indicator extraction and defanging |
+| `esha/core/msg.py`, `esha/core/inputs.py` | Outlook `.msg` conversion and input decoding |
 | `esha/core/exports.py` | CSV, JSON, STIX 2.1, MISP and HTML report exports |
 | `esha/core/analyzer.py` | Findings, alignment and scoring |
 | `esha/app.py` | Flask web app and JSON API |

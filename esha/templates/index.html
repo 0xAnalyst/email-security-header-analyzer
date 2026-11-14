@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="esha-engine" content="{{ engine or 'server' }}">
+  <meta name="esha-version" content="{{ version }}">
 {%- if engine == 'browser' %}
   {#- Static hosting (GitHub Pages) cannot send HTTP headers, so the policy is set here.
       connect-src 'self' means the page can only fetch ESHA's own files. #}
@@ -39,21 +40,28 @@
   <main id="main">
     <section id="intake" class="intake" aria-labelledby="intake-title">
       <div class="intake-copy">
+        {%- if engine == 'browser' %}
+        <p class="privacy-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><rect x="4" y="10" width="16" height="11" rx="2" fill="currentColor"/></svg>Private by design: runs entirely in your browser</p>
         <h1 id="intake-title">Where did this email really come from?</h1>
-        <p class="lede">Paste the message headers or drop an <code>.eml</code> file. You get the relay route, SPF, DKIM and DMARC results with every domain mismatch, and the signs of spoofing or phishing in the links and attachments, in one report.</p>
+        <p class="lede">Paste the message headers or drop an <code>.eml</code> or Outlook <code>.msg</code> file. Everything is analyzed right here in your browser, so nothing is uploaded, stored or shared, not even with us. You get the relay route, SPF, DKIM and DMARC results with every domain mismatch, and the signs of spoofing or phishing in the links and attachments, in one report.</p>
+        {%- else %}
+        <p class="privacy-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><rect x="4" y="10" width="16" height="11" rx="2" fill="currentColor"/></svg>Private: analyzed on this computer, no third-party services</p>
+        <h1 id="intake-title">Where did this email really come from?</h1>
+        <p class="lede">Paste the message headers or drop an <code>.eml</code> or Outlook <code>.msg</code> file. ESHA analyzes it on this computer and never sends it to third-party services. You get the relay route, SPF, DKIM and DMARC results with every domain mismatch, and the signs of spoofing or phishing in the links and attachments, in one report.</p>
+        {%- endif %}
       </div>
       <form id="form" class="intake-form" novalidate>
         <label for="headers" class="field-label">Message headers</label>
         <div class="drop" id="drop">
           <textarea id="headers" name="headers" spellcheck="false" autocomplete="off"
             placeholder="Received: from mail.example.com (mail.example.com [203.0.113.5])&#10;        by mx.example.net with ESMTPS id 4F2A...&#10;Authentication-Results: mx.example.net; spf=pass ...&#10;From: Alice &lt;alice@example.com&gt;&#10;Subject: ...">{{ prefill or '' }}</textarea>
-          <div class="drop-hint" aria-hidden="true">Drop the .eml file to analyze it</div>
+          <div class="drop-hint" aria-hidden="true">Drop the .eml or .msg file to analyze it</div>
         </div>
         <div class="intake-actions">
           <button type="submit" class="btn primary" id="btn-analyze">Analyze headers</button>
           <label class="btn ghost file-btn">
-            <input type="file" id="file" accept=".eml,.txt,.mbox,message/rfc822,text/plain">
-            Open .eml file
+            <input type="file" id="file" accept=".eml,.msg,.txt,.mbox,message/rfc822,application/vnd.ms-outlook,text/plain">
+            Open .eml or .msg
           </label>
           <span class="samples">Try a sample:
             <button type="button" class="link" data-sample="legit_github.eml">legitimate</button>,
@@ -67,7 +75,8 @@
             <button type="button" class="link" data-sample="archive_payloads.eml">password-protected ZIP</button>,
             <button type="button" class="link" data-sample="quishing.eml">QR-code phishing</button>,
             <button type="button" class="link" data-sample="calendar_phish.eml">calendar invite</button>,
-            <button type="button" class="link" data-sample="thread_hijack.eml">thread hijack</button>
+            <button type="button" class="link" data-sample="thread_hijack.eml">thread hijack</button>,
+            <button type="button" class="link" data-sample="outlook_phish.msg">Outlook .msg file</button>
           </span>
         </div>
         <p class="error" id="error" role="alert" hidden></p>
@@ -76,7 +85,7 @@
         <h2>Finding the headers</h2>
         <dl>
           <dt>Gmail</dt><dd>Open the message, choose <em>More</em>, then <em>Show original</em>.</dd>
-          <dt>Outlook</dt><dd>Open the message, choose <em>…</em> then <em>View</em>, then <em>View message source</em> (or <em>File › Properties</em> on desktop).</dd>
+          <dt>Outlook</dt><dd>Drag the message to your desktop and drop the <code>.msg</code> file here, or choose <em>…</em> then <em>View</em>, then <em>View message source</em> (or <em>File › Properties</em> on desktop).</dd>
           <dt>Apple Mail</dt><dd><em>View › Message › All Headers</em>, or drag the message to your desktop to save an .eml.</dd>
           <dt>Thunderbird</dt><dd><em>More › View Source</em>, or press Ctrl+U.</dd>
         </dl>
