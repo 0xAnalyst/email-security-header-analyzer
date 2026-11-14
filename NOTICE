@@ -1,0 +1,16 @@
+Email Security Header Analyzer (ESHA)
+Copyright (C) 2026 0xAnalyst
+
+ESHA is a modified version of MHA (E-Mail Header Analyzer),
+https://github.com/cyberdefenders/email-header-analyzer,
+originally written by lnxg33k and contributors.
+
+Modifications (November 2026): new analysis engine, phishing and
+authentication-mismatch detection, user interface, JSON API, command line,
+tests and packaging. Both the original work and these modifications are
+licensed under the GNU General Public License v3.0 (see LICENSE.md).
+
+Third-party components:
+- Overpass and Overpass Mono fonts, SIL Open Font License 1.1
+- GeoLite2 data created by MaxMind, CC BY-SA 4.0, https://www.maxmind.com
+- Flag sprite images inherited from MHA

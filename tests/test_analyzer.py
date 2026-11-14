@@ -2,11 +2,11 @@ from pathlib import Path
 
 import pytest
 
-from mha.app import create_app
-from mha.core import analyze
-from mha.core.auth import parse_authentication_results
-from mha.core.domains import lookalike_brand, org_domain
-from mha.core.received import build_hops, find_ips, parse_received
+from esha.app import create_app
+from esha.core import analyze
+from esha.core.auth import parse_authentication_results
+from esha.core.domains import lookalike_brand, org_domain
+from esha.core.received import build_hops, find_ips, parse_received
 
 SAMPLES = Path(__file__).parent / "samples"
 
@@ -216,12 +216,12 @@ def test_headers_only_has_no_content_section():
     ("gmail.com", "gmail.com", False),
 ])
 def test_cousin_domains(cand, ref, expected):
-    from mha.core.domains import cousin_domain
+    from esha.core.domains import cousin_domain
     assert cousin_domain(cand, ref) is expected
 
 
 def test_link_text_mismatch_flag():
-    from mha.core.body import _link_flags
+    from esha.core.body import _link_flags
     flags = _link_flags("https://evil.example/x", "https://www.paypal.com/signin", "paypal.com")
     assert any(f.startswith("text shows www.paypal.com") for f in flags)
     assert _link_flags("https://www.paypal.com/x", "www.paypal.com", "paypal.com") == []

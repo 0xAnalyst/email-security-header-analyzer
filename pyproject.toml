@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mha"
+name = "esha"
 dynamic = ["version"]
-description = "E-Mail Header Analyzer: trace relays, check SPF/DKIM/DMARC/ARC and flag phishing indicators"
+description = "Email Security Header Analyzer: detect spoofing, SPF/DKIM/DMARC mismatches and phishing from email headers and .eml files"
 readme = "README.md"
 license = { file = "LICENSE.md" }
 requires-python = ">=3.9"
@@ -21,16 +21,16 @@ server = ["gunicorn>=22.0"]
 dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.scripts]
-mha = "mha.__main__:main"
+esha = "esha.__main__:main"
 
 [tool.setuptools.dynamic]
-version = { attr = "mha.__version__" }
+version = { attr = "esha.__version__" }
 
 [tool.setuptools.packages.find]
-include = ["mha*"]
+include = ["esha*"]
 
 [tool.setuptools.package-data]
-mha = ["templates/*", "static/**/*"]
+esha = ["templates/*", "static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

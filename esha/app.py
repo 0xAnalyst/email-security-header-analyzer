@@ -9,7 +9,7 @@ from . import __version__
 from .core import analyze
 from .core.geo import database_info
 
-MAX_UPLOAD = int(os.environ.get("MHA_MAX_UPLOAD_MB", "10")) * 1024 * 1024
+MAX_UPLOAD = int(os.environ.get("ESHA_MAX_UPLOAD_MB", "10")) * 1024 * 1024
 
 
 def _decode(data: bytes) -> str:

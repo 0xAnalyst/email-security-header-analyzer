@@ -1,8 +1,8 @@
 services:
-  mha:
+  esha:
     build: .
-    image: mha:latest
-    container_name: mha
+    image: esha:latest
+    container_name: esha
     restart: unless-stopped
     ports:
       - "127.0.0.1:8080:8080"
@@ -10,6 +10,6 @@ services:
     tmpfs: [/tmp]
     # Optional: mount newer GeoLite2 databases (see scripts/update_geoip.py)
     # environment:
-    #   MHA_GEOIP_DIR: /geoip
+    #   ESHA_GEOIP_DIR: /geoip
     # volumes:
     #   - ./geoip:/geoip:ro

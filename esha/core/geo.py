@@ -1,7 +1,7 @@
 """Offline IP enrichment using MaxMind GeoLite2 databases.
 
-Databases are looked up in ``$MHA_GEOIP_DIR`` (if set) and then in the
-bundled ``mha/static/data`` folder. Country is bundled; drop
+Databases are looked up in ``$ESHA_GEOIP_DIR`` (if set) and then in the
+bundled ``esha/static/data`` folder. Country is bundled; drop
 ``GeoLite2-City.mmdb`` and/or ``GeoLite2-ASN.mmdb`` next to it (see
 ``scripts/update_geoip.py``) to unlock city and network-owner lookups.
 """
@@ -24,8 +24,8 @@ BUNDLED = Path(__file__).resolve().parent.parent / "static" / "data"
 
 def _search_dirs() -> list[Path]:
     dirs = []
-    if os.environ.get("MHA_GEOIP_DIR"):
-        dirs.append(Path(os.environ["MHA_GEOIP_DIR"]))
+    if os.environ.get("ESHA_GEOIP_DIR"):
+        dirs.append(Path(os.environ["ESHA_GEOIP_DIR"]))
     dirs.append(BUNDLED)
     return dirs
 

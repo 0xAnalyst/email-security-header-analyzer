@@ -1,10 +1,10 @@
 """Command-line interface.
 
-    python -m mha                      # start the web UI on http://127.0.0.1:8080
-    python -m mha serve -b 0.0.0.0 -p 9000
-    python -m mha analyze message.eml  # human-readable report
-    python -m mha analyze message.eml --json
-    cat headers.txt | python -m mha analyze -
+    python -m esha                      # start the web UI on http://127.0.0.1:8080
+    python -m esha serve -b 0.0.0.0 -p 9000
+    python -m esha analyze message.eml  # human-readable report
+    python -m esha analyze message.eml --json
+    cat headers.txt | python -m esha analyze -
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ RESET = "\033[0m"
 def _serve(args):
     from .app import app
     url = f"http://{'127.0.0.1' if args.bind in ('0.0.0.0', '::') else args.bind}:{args.port}"
-    print(f"MHA {__version__} running at {url}  (Ctrl+C to stop)")
+    print(f"ESHA {__version__} running at {url}  (Ctrl+C to stop)")
     if args.open:
         webbrowser.open(url)
     app.run(host=args.bind, port=args.port, debug=args.debug)
@@ -71,7 +71,7 @@ def _analyze(args):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(prog="mha", description="E-Mail Header Analyzer")
+    p = argparse.ArgumentParser(prog="esha", description="Email Security Header Analyzer (ESHA)")
     p.add_argument("--version", action="version", version=__version__)
     sub = p.add_subparsers(dest="cmd")
     sp = sub.add_parser("serve", help="run the web UI (default)")

@@ -6,9 +6,9 @@
 3. Run:
        MAXMIND_ACCOUNT_ID=123456 MAXMIND_LICENSE_KEY=xxxx python scripts/update_geoip.py
 
-By default this downloads Country, City and ASN into mha/static/data, which
-MHA picks up automatically (City adds city names, ASN adds the network owner).
-Use --dest to write elsewhere and point MHA at it with MHA_GEOIP_DIR.
+By default this downloads Country, City and ASN into esha/static/data, which
+ESHA picks up automatically (City adds city names, ASN adds the network owner).
+Use --dest to write elsewhere and point ESHA at it with ESHA_GEOIP_DIR.
 """
 import argparse
 import base64
@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 
 URL = "https://download.maxmind.com/geoip/databases/{edition}/download?suffix=tar.gz"
-DEFAULT_DEST = Path(__file__).resolve().parent.parent / "mha" / "static" / "data"
+DEFAULT_DEST = Path(__file__).resolve().parent.parent / "esha" / "static" / "data"
 
 
 def fetch(edition, account, key, dest):

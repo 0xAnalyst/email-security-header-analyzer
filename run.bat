@@ -9,4 +9,4 @@ if not exist .venv (
 call .venv\Scripts\activate.bat
 python -m pip install -q --upgrade pip
 python -m pip install -q -r requirements.txt
-python -m mha --open %*
+python -m esha --open %*

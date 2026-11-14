@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Email Header Analyzer (MHA)</title>
-  <meta name="description" content="Trace an email's route, check SPF, DKIM and DMARC, and spot phishing signs from its headers.">
+  <title>Email Security Header Analyzer (ESHA)</title>
+  <meta name="description" content="Email Security Header Analyzer: detect spoofing, SPF, DKIM and DMARC mismatches, and phishing signs in email headers and .eml files.">
   <link rel="icon" href="{{ url_for('static', filename='imgs/fav.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ version }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/flags.css') }}">
@@ -13,10 +13,10 @@
 <body>
   <a class="skip" href="#main">Skip to content</a>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="MHA home">
+    <a class="brand" href="/" aria-label="Email Security Header Analyzer home">
       <svg class="brand-mark" viewBox="0 0 40 28" aria-hidden="true"><rect x="1.5" y="1.5" width="37" height="25" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M2 3l18 13L38 3" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path class="brand-stripe" d="M1.5 23h37" stroke-width="3" stroke-dasharray="5 4"/></svg>
-      <span class="brand-name">MHA</span>
-      <span class="brand-sub">Email Header Analyzer</span>
+      <span class="brand-name">ESHA</span>
+      <span class="brand-sub">Email Security Header Analyzer</span>
     </a>
     <nav class="topnav" aria-label="Actions">
       <button type="button" class="btn ghost" id="btn-new" hidden>New analysis</button>
@@ -72,8 +72,8 @@
   </main>
 
   <footer class="foot">
-    <span>MHA {{ version }}</span>
-    <span>Fork of <a href="https://github.com/cyberdefenders/email-header-analyzer">cyberdefenders/email-header-analyzer</a></span>
+    <span>ESHA {{ version }}</span>
+    <span>Based on <a href="https://github.com/cyberdefenders/email-header-analyzer">MHA by lnxg33k</a>, GPL-3.0</span>
     <span>IP geolocation by MaxMind GeoLite2</span>
   </footer>
 

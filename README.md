@@ -1,8 +1,8 @@
-# MHA: E-Mail Header Analyzer
+# Email Security Header Analyzer (ESHA)
 
-Paste an email's headers, or drop the whole `.eml` file, and MHA tells you where the message really came from: whether SPF, DKIM and DMARC passed, which identities don't match the sender, and which signs of phishing or spoofing it shows. Analysis runs entirely on your machine and never contacts third-party services.
+Paste an email's headers, or drop the whole `.eml` file, and ESHA tells you where the message really came from: whether SPF, DKIM and DMARC passed, which identities don't match the sender, and which signs of phishing or spoofing it shows. Analysis runs entirely on your machine and never contacts third-party services.
 
-MHA 2 is a rewrite of [cyberdefenders/email-header-analyzer](https://github.com/cyberdefenders/email-header-analyzer) (originally by [@lnxg33k](https://github.com/lnxg33k)), with a new analysis engine, interface, API and command line.
+Built for SOC analysts, incident responders and IT admins who triage suspicious email. ESHA started from the open-source [MHA (E-Mail Header Analyzer)](https://github.com/cyberdefenders/email-header-analyzer) by [@lnxg33k](https://github.com/lnxg33k), and its analysis engine, interface, API and command line have since been rewritten.
 
 ## What it checks
 
@@ -21,7 +21,7 @@ MHA 2 is a rewrite of [cyberdefenders/email-header-analyzer](https://github.com/
 
 **Route**
 - Every relay hop: HELO, reverse DNS, IPv4/IPv6, protocol, TLS, timestamp and per-hop delay
-- Correct handling of server clock skew and missing time zones (MHA 1 reported these as 24-hour delays or crashed)
+- Correct handling of server clock skew and missing time zones (the original MHA reported these as 24-hour delays or crashed)
 - Originating IP with country (plus city and network owner if you add the free MaxMind City/ASN databases)
 - Residential or dynamic sending IPs, missing reverse DNS, bare-IP HELO greetings
 
@@ -38,7 +38,7 @@ Every result is combined into a 0–100 risk score with a plain-language explana
 
 You need Python 3.9 or newer.
 
-**macOS**: double-click `Start MHA.command` in Finder, or run `./run.sh` in Terminal.
+**macOS**: double-click `Start ESHA.command` in Finder, or run `./run.sh` in Terminal.
 
 **Linux**
 ```sh
@@ -53,7 +53,7 @@ The script creates a virtual environment, installs dependencies and opens http:/
 ```sh
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python -m mha --open          # options: -b 0.0.0.0 -p 9000
+python -m esha --open          # options: -b 0.0.0.0 -p 9000
 ```
 
 **Docker**
@@ -65,9 +65,9 @@ The image runs gunicorn as a non-root user with a read-only filesystem and a hea
 ## Command line
 
 ```sh
-python -m mha analyze message.eml            # colour report in the terminal
-python -m mha analyze message.eml --json     # full JSON report
-pbpaste | python -m mha analyze -            # headers from the clipboard (macOS)
+python -m esha analyze message.eml            # colour report in the terminal
+python -m esha analyze message.eml --json     # full JSON report
+pbpaste | python -m esha analyze -            # headers from the clipboard (macOS)
 ```
 `analyze` exits with code 2 when the verdict is high risk, so it can be used in scripts.
 
@@ -92,7 +92,7 @@ The bundled GeoLite2 Country database is from 2018, so some locations are out of
    MAXMIND_ACCOUNT_ID=123456 MAXMIND_LICENSE_KEY=xxxx python scripts/update_geoip.py
    ```
 
-The databases are saved to `mha/static/data`. To keep them elsewhere, use `--dest /path` and set `MHA_GEOIP_DIR=/path`.
+The databases are saved to `esha/static/data`. To keep them elsewhere, use `--dest /path` and set `ESHA_GEOIP_DIR=/path`.
 
 ## Privacy and security
 
@@ -106,21 +106,21 @@ The databases are saved to `mha/static/data`. To keep them elsewhere, use `--des
 ```sh
 pip install -r requirements-dev.txt
 pytest            # 39 tests, including real-world style samples in tests/samples
-ruff check mha tests
+ruff check esha tests
 ```
 
 Project layout:
 
 | Path | Purpose |
 | --- | --- |
-| `mha/core/received.py` | Received-header parsing, IP extraction, hop timing |
-| `mha/core/auth.py` | Authentication-Results, ARC, DKIM-Signature, Received-SPF, spam-filter parsing |
-| `mha/core/domains.py` | Organisational domains, look-alike and cousin-domain detection |
-| `mha/core/body.py` | Link, attachment and form inspection |
-| `mha/core/analyzer.py` | Findings, alignment and scoring |
-| `mha/app.py` | Flask web app and JSON API |
-| `mha/__main__.py` | Command line |
+| `esha/core/received.py` | Received-header parsing, IP extraction, hop timing |
+| `esha/core/auth.py` | Authentication-Results, ARC, DKIM-Signature, Received-SPF, spam-filter parsing |
+| `esha/core/domains.py` | Organisational domains, look-alike and cousin-domain detection |
+| `esha/core/body.py` | Link, attachment and form inspection |
+| `esha/core/analyzer.py` | Findings, alignment and scoring |
+| `esha/app.py` | Flask web app and JSON API |
+| `esha/__main__.py` | Command line |
 
-## License
+## Credits and license
 
-GPL-3.0, the same as the original project. See [LICENSE.md](LICENSE.md). Fonts: Overpass (SIL Open Font License). IP geolocation: MaxMind GeoLite2 (CC BY-SA 4.0).
+ESHA is derived from [MHA](https://github.com/cyberdefenders/email-header-analyzer) by @lnxg33k and contributors, and like MHA it is licensed under GPL-3.0. See [LICENSE.md](LICENSE.md). Fonts: Overpass (SIL Open Font License). IP geolocation: MaxMind GeoLite2 (CC BY-SA 4.0).

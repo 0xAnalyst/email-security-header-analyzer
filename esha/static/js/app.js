@@ -1,4 +1,4 @@
-/* MHA front end. All untrusted header content is inserted with textContent. */
+/* ESHA front end. All untrusted header content is inserted with textContent. */
 (function () {
   "use strict";
 
@@ -58,7 +58,7 @@
   $("#btn-theme").addEventListener("click", function () {
     var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", next);
-    try { localStorage.setItem("mha-theme", next); } catch (e) {}
+    try { localStorage.setItem("esha-theme", next); } catch (e) {}
   });
 
   /* ---------------- input ---------------- */
@@ -74,7 +74,7 @@
         if (!res.ok) throw new Error(res.j.error || "The server could not analyze these headers.");
         last = res.j; render(res.j);
       })
-      .catch(function (e) { showError(e.message || "The server could not be reached. Check that MHA is still running."); })
+      .catch(function (e) { showError(e.message || "The server could not be reached. Check that ESHA is still running."); })
       .finally(function () { btnAnalyze.disabled = false; btnAnalyze.textContent = "Analyze headers"; });
   }
   function analyzeFile(file) {
@@ -121,7 +121,7 @@
   btnExport.addEventListener("click", function () {
     if (!last) return;
     var blob = new Blob([JSON.stringify(last, null, 2)], { type: "application/json" });
-    var a = h("a", { href: URL.createObjectURL(blob), download: "mha-report-" + (last.meta.analyzed_at || "").replace(/[:]/g, "") + ".json" });
+    var a = h("a", { href: URL.createObjectURL(blob), download: "esha-report-" + (last.meta.analyzed_at || "").replace(/[:]/g, "") + ".json" });
     document.body.append(a); a.click(); a.remove();
   });
   btnCopy.addEventListener("click", function () {
@@ -289,7 +289,7 @@
       cell("DMARC", a.dmarc.result === "unknown" ? "none" : a.dmarc.result, [
         a.dmarc.header_from ? h("span", {}, "From domain ", h("span", { class: "mono", text: a.dmarc.header_from })) : null,
         a.dmarc.policy ? "Policy p=" + a.dmarc.policy.toLowerCase() : null,
-        a.dmarc.computed ? "Worked out by MHA from SPF and DKIM; the receiving server recorded no result." : null]),
+        a.dmarc.computed ? "Worked out by ESHA from SPF and DKIM; the receiving server recorded no result." : null]),
       cell("ARC", a.arc.result, [a.arc.sets ? a.arc.sets + " seal" + (a.arc.sets > 1 ? "s" : "") + (a.arc.chain_validation.length ? ", cv=" + a.arc.chain_validation.join(", ") : "") : "Not forwarded through an ARC sealer"]));
     var sp = r.spam, bits = [];
     if (sp.microsoft && Object.keys(sp.microsoft).length) bits.push("Microsoft 365: " + Object.keys(sp.microsoft).map(function (k) { return k + " " + sp.microsoft[k]; }).join(", "));
