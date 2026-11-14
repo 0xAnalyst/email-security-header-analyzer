@@ -95,7 +95,29 @@ curl -s localhost:8080/api/analyze -H 'Content-Type: message/rfc822' --data-bina
 curl -s localhost:8080/api/health
 ```
 
-The response contains `score`, `findings` (each with `severity`, `title`, `detail`, `category`), `auth` (including the `alignment` table), `hops`, `origin`, `content` (links and attachments), `spam`, `summary` and the decoded `headers`.
+The response contains `score`, `findings` (each with `rule_id`, `severity`, `title`, `detail`, `category`, `weight`, `description`, `remediation` and `attack`), `auth` (including the `alignment` table), `hops`, `origin`, `content` (links and attachments), `spam`, `summary` and the decoded `headers`.
+
+## Detection rules and scoring
+
+Every finding comes from a rule with a stable ID (`ESHA-001` to `ESHA-9xx`), a description, advice on what to do, and MITRE ATT&CK techniques where one applies. The full list is in [docs/RULES.md](docs/RULES.md), or run:
+```sh
+python -m esha rules            # table
+python -m esha rules --json     # machine-readable
+```
+
+Each finding adds points to the 0–100 score: by default critical 40, high 25, medium 12, low 4, and notes 0. A total of 60 or more is **high risk** and 25 or more is **suspicious**. Any critical finding lifts the score to at least 80. To change this, create `esha.json` in the directory you run ESHA from, or point `ESHA_CONFIG` at a file:
+
+```json
+{
+  "severity_weights": {"medium": 10, "low": 3},
+  "rule_weights": {"ESHA-105": 6, "ESHA-304": 0},
+  "thresholds": {"high": 65, "medium": 25},
+  "critical_floor": 80,
+  "disabled_rules": ["ESHA-209"]
+}
+```
+
+`ESHA_WEIGHTS` overrides single values without a file, for example `ESHA_WEIGHTS="ESHA-304=0,threshold.high=70,disable=ESHA-209"`. ESHA refuses to start with an invalid configuration, and each report records the settings it used in `meta.scoring`. The GitHub Pages site always uses the defaults.
 
 ## Keep geolocation current
 

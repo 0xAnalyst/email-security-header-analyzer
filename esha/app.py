@@ -8,6 +8,7 @@ from flask import Flask, jsonify, render_template, request
 from . import __version__
 from .core import analyze
 from .core.geo import database_info
+from .core.scoring import get_config
 
 MAX_UPLOAD = int(os.environ.get("ESHA_MAX_UPLOAD_MB", "10")) * 1024 * 1024
 
@@ -22,6 +23,7 @@ def _decode(data: bytes) -> str:
 
 
 def create_app() -> Flask:
+    get_config()  # fail at startup, not on the first request, if the scoring config is invalid
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD
     app.json.sort_keys = False

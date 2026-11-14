@@ -1,6 +1,7 @@
 """High-level analysis: turn raw headers into a structured, JSON-safe report."""
 from __future__ import annotations
 
+import os
 import re
 from datetime import datetime, timezone
 from email.parser import HeaderParser
@@ -23,10 +24,13 @@ from .domains import (
     parse_mailbox_list,
 )
 from .received import build_hops, find_ips, is_public_ip, parse_date
+from .rules import BY_ID, RULES
+from .scoring import DEFAULT_SEVERITY_WEIGHTS, ScoringConfig, get_config
+
+# Kept for backwards compatibility; the active weights come from esha.core.scoring.
+SEVERITY_WEIGHT = DEFAULT_SEVERITY_WEIGHTS
 
 MAX_INPUT = 2_000_000  # characters
-
-SEVERITY_WEIGHT = {"critical": 40, "high": 25, "medium": 12, "low": 4, "info": 0, "pass": 0}
 
 _KNOWN_HEADER = re.compile(
     r"^(X-[\w-]+|Received|From|To|Cc|Bcc|Subject|Date|Message-ID|Return-Path|Reply-To|Sender|"
@@ -96,12 +100,35 @@ def normalize(text: str, from_file: bool = False) -> str:
     return "\n".join(out)
 
 
-def _finding(severity, title, detail="", category="general", id_=None):
+# Set ESHA_STRICT_RULES=1 (the test suite does) to fail loudly when a finding
+# uses a severity or category its rule doesn't declare.
+STRICT_RULES = os.environ.get("ESHA_STRICT_RULES") == "1"
+
+
+def _finding(rule_key, severity, title, detail="", category=None, id_=None):
+    rule = RULES[rule_key]
+    if STRICT_RULES and (severity not in rule.severities or (category and category != rule.category)):
+        raise ValueError(f"{rule.id} ({rule_key}) emitted with severity={severity!r} category={category!r}")
+    # "id" is the original slug (kept for compatibility); "rule_id" is the stable rule ID.
     return {"id": id_ or re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-"),
-            "severity": severity, "title": title, "detail": detail, "category": category}
+            "severity": severity, "title": title, "detail": detail, "category": rule.category,
+            "rule_id": rule.id}
 
 
-def analyze(text: str, from_file: bool = False) -> dict:
+def _finalize(findings: list[dict], cfg: ScoringConfig) -> list[dict]:
+    """Drop disabled rules and attach rule metadata and the points each finding scored."""
+    out = []
+    for f in findings:
+        rule = BY_ID[f["rule_id"]]
+        if rule.id in cfg.disabled_rules:
+            continue
+        f.update(weight=cfg.points(rule, f["severity"]), description=rule.description,
+                 remediation=rule.remediation, attack=rule.attack_refs())
+        out.append(f)
+    return out
+
+
+def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = None) -> dict:
     raw = normalize(text or "", from_file=from_file)
     msg = HeaderParser().parsestr(raw, headersonly=True)
     items = [(k, v) for k, v in msg.items()]
@@ -245,80 +272,80 @@ def analyze(text: str, from_file: bool = False) -> dict:
     # ----------------------------------------------------------- indicators
     F: list[dict] = []
     if not items:
-        F.append(_finding("info", "No headers found", "The input did not contain any recognisable email headers.", "input"))
+        F.append(_finding("no-headers", "info", "No headers found", "The input did not contain any recognisable email headers.", "input"))
     if not hops and items:
-        F.append(_finding("medium", "No Received headers",
+        F.append(_finding("no-received", "medium", "No Received headers",
                           "There is no relay path. These may not be the original headers, or the message was injected locally.",
                           "routing"))
 
     # authentication findings
     if dmarc["result"] == "pass":
-        F.append(_finding("pass", "DMARC passed" + (" (computed)" if dmarc["computed"] else ""),
+        F.append(_finding("dmarc-pass", "pass", "DMARC passed" + (" (computed)" if dmarc["computed"] else ""),
                           f"The visible From domain ({from_domain or 'n/a'}) is authenticated.", "authentication"))
     elif dmarc["result"] in ("fail", "permerror", "temperror"):
         pol = f" Domain policy: p={dmarc['policy']}." if dmarc.get("policy") else ""
         if (dmarc.get("policy") or "").lower() == "none":
             pol += " With p=none the domain owner asks receivers not to block spoofed mail, so it may still reach inboxes."
-        F.append(_finding("high", "DMARC failed" + (" (computed)" if dmarc["computed"] else ""),
+        F.append(_finding("dmarc-fail", "high", "DMARC failed" + (" (computed)" if dmarc["computed"] else ""),
                           f"The From domain ({from_domain}) could not be authenticated by aligned SPF or DKIM.{pol}",
                           "authentication"))
     if dmarc["result"] == "pass" and (dmarc.get("policy") or "").lower() == "none":
-        F.append(_finding("info", "Sender's DMARC policy is p=none",
+        F.append(_finding("dmarc-policy-none", "info", "Sender's DMARC policy is p=none",
                           f"{from_domain} only monitors spoofing; it does not ask receivers to block it.", "authentication"))
     if dmarc["result"] in ("none", "unknown", "bestguesspass") and items and from_domain:
-        F.append(_finding("low", "No DMARC verdict",
+        F.append(_finding("dmarc-missing", "low", "No DMARC verdict",
                           f"No DMARC result was recorded for {from_domain}; the sender may not publish a DMARC policy.",
                           "authentication"))
 
     dmarc_ok = dmarc["result"] == "pass"
     if spf["result"] == "pass" and spf["aligned"]:
-        F.append(_finding("pass", "SPF passed and aligned", f"Envelope domain {spf['domain'] or 'n/a'} matches From.", "authentication"))
+        F.append(_finding("spf-aligned", "pass", "SPF passed and aligned", f"Envelope domain {spf['domain'] or 'n/a'} matches From.", "authentication"))
     elif spf["result"] == "pass":
-        F.append(_finding("info" if dmarc_ok else "medium", "SPF passed for a different domain",
+        F.append(_finding("spf-mismatch", "info" if dmarc_ok else "medium", "SPF passed for a different domain",
                           f"The server is authorised to send for {spf['domain'] or 'the envelope domain'}, not for the From domain {from_domain}."
                           + ("" if dmarc_ok else " An SPF pass on an unrelated domain is a common way to make spoofed mail look authenticated."),
                           "authentication", "spf-mismatch"))
     elif spf["result"] in ("fail", "hardfail"):
-        F.append(_finding("high", "SPF failed", f"The sending server is not authorised to send for {spf['domain'] or 'the envelope domain'}.", "authentication"))
+        F.append(_finding("spf-fail", "high", "SPF failed", f"The sending server is not authorised to send for {spf['domain'] or 'the envelope domain'}.", "authentication"))
     elif spf["result"] == "softfail":
-        F.append(_finding("medium", "SPF soft-failed", f"The sending server is probably not authorised for {spf['domain'] or 'the envelope domain'}.", "authentication"))
+        F.append(_finding("spf-softfail", "medium", "SPF soft-failed", f"The sending server is probably not authorised for {spf['domain'] or 'the envelope domain'}.", "authentication"))
     elif spf["result"] in ("permerror", "temperror"):
-        F.append(_finding("low", f"SPF {spf['result']}", "The SPF record could not be evaluated.", "authentication"))
+        F.append(_finding("spf-error", "low", f"SPF {spf['result']}", "The SPF record could not be evaluated.", "authentication"))
 
     if dkim_result == "pass" and dkim_aligned:
-        F.append(_finding("pass", "DKIM signature valid and aligned",
+        F.append(_finding("dkim-aligned", "pass", "DKIM signature valid and aligned",
                           ", ".join(f"d={x['domain']}" for x in dkim_results if x["result"] == "pass"), "authentication"))
     elif dkim_result == "pass":
         signers = ", ".join(sorted({x["domain"] for x in dkim_results if x["result"] == "pass"}))
-        F.append(_finding("info" if dmarc_ok else "medium", "DKIM signed by a different domain",
+        F.append(_finding("dkim-mismatch", "info" if dmarc_ok else "medium", "DKIM signed by a different domain",
                           f"Valid signature from {signers}, but none from {from_domain}."
                           + ("" if dmarc_ok else " The signature proves who sent it, and it isn't the domain shown in From."),
                           "authentication", "dkim-mismatch"))
     elif dkim_result in ("fail", "permerror", "temperror", "neutral", "policy"):
-        F.append(_finding("medium", f"DKIM {dkim_result}", "A DKIM signature was present but did not verify — the message may have been altered.", "authentication"))
+        F.append(_finding("dkim-fail", "medium", f"DKIM {dkim_result}", "A DKIM signature was present but did not verify — the message may have been altered.", "authentication"))
     elif dkim_result == "none" and items:
-        F.append(_finding("low", "Message is not DKIM-signed", "", "authentication"))
+        F.append(_finding("dkim-none", "low", "Message is not DKIM-signed", "", "authentication"))
     if dkim_result == "unverified":
-        F.append(_finding("info", "DKIM signature present but no verification result",
+        F.append(_finding("dkim-unverified", "info", "DKIM signature present but no verification result",
                           "No Authentication-Results header from the receiving server was included.", "authentication"))
 
     if compauth and compauth[0]["result"] in ("fail", "softfail"):
-        F.append(_finding("high" if compauth[0]["result"] == "fail" else "medium",
+        F.append(_finding("compauth-fail", "high" if compauth[0]["result"] == "fail" else "medium",
                           f"Microsoft composite authentication {compauth[0]['result']}",
                           f"reason={compauth[0]['reason']}", "authentication"))
     if any(cv == "fail" for cv in cvs) or arc["result"] == "fail":
-        F.append(_finding("medium", "ARC chain is broken", "A forwarding service's authentication seal failed validation.", "authentication"))
+        F.append(_finding("arc-broken", "medium", "ARC chain is broken", "A forwarding service's authentication seal failed validation.", "authentication"))
 
     # conflicting / forged authentication results
     if s and rspf and rspf[0]["result"] and s[0]["result"] != rspf[0]["result"]:
-        F.append(_finding("low", "Conflicting SPF results",
+        F.append(_finding("spf-conflict", "low", "Conflicting SPF results",
                           f"Authentication-Results says {s[0]['result']} but Received-SPF says {rspf[0]['result']}.", "authentication"))
     relay_orgs = {org_domain(h.by_host) for h in hops if h.by_host and "." in h.by_host}
     for extra in ar_list[1:]:
         sid = (extra["authserv_id"] or "").lower()
         claims_pass = any(r["result"] == "pass" for r in extra["results"] if r["method"] in ("dmarc", "spf", "dkim"))
         if sid and claims_pass and org_domain(sid) not in relay_orgs and dmarc["result"] != "pass":
-            F.append(_finding("medium", "Authentication-Results from an unexpected server",
+            F.append(_finding("forged-ar", "medium", "Authentication-Results from an unexpected server",
                               f"A lower Authentication-Results header from {sid} claims a pass, but {sid} does not appear in the relay path. "
                               "Senders sometimes insert fake results to fool analysts.", "authentication", "forged-ar"))
             break
@@ -329,16 +356,16 @@ def analyze(text: str, from_file: bool = False) -> dict:
         detail = origin_hop.from_detail.lower()
         rdns = detail.split("[")[0].strip().rstrip(".") if "[" in detail else ""
         if rdns == "unknown":
-            F.append(_finding("low", "Sending server has no reverse DNS",
+            F.append(_finding("no-rdns", "low", "Sending server has no reverse DNS",
                               f"{origin_hop.from_ip} did not resolve to a hostname at the receiving server.", "routing", "no-rdns"))
         host_for_check = rdns if rdns not in ("", "unknown") else origin_hop.from_host.lower()
         if re.search(r"(\d{1,3}[-.]){3}\d{1,3}|\b(dsl|adsl|dyn|dynamic|dhcp|pool|cable|ppp|pppoe|dial|cust|broadband|residential|"
                      r"res\.|user|client|ip-\d)", host_for_check):
-            F.append(_finding("medium", "Sent from a residential or dynamic IP",
+            F.append(_finding("dynamic-ip", "medium", "Sent from a residential or dynamic IP",
                               f"{host_for_check} looks like a home or dynamic connection, not a mail server.", "routing", "dynamic-ip"))
         helo = origin_hop.from_host.lower().strip("[]")
         if helo and _looks_ip(helo):
-            F.append(_finding("low", "Sending server greeted with a bare IP address",
+            F.append(_finding("helo-bare-ip", "low", "Sending server greeted with a bare IP address",
                               f"HELO {helo}; real mail servers normally use their hostname.", "routing"))
 
     # sender identity findings
@@ -346,13 +373,13 @@ def analyze(text: str, from_file: bool = False) -> dict:
         name = from_mb["name"]
         emb = re.search(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", name or "")
         if emb and domain_of(emb.group(0)) and not aligned(domain_of(emb.group(0)), from_domain):
-            F.append(_finding("high", "Display name contains a different email address",
+            F.append(_finding("display-name-email", "high", "Display name contains a different email address",
                               f'Shows "{emb.group(0)}" but the real sender is {from_mb["address"]}.', "identity"))
         la = lookalike_brand(from_domain)
         if la:
             kind = {"homoglyph": "uses look-alike characters", "typo": "is one character off",
                     "embedded": "embeds the brand name"}[la["reason"]]
-            F.append(_finding("critical" if la["reason"] != "embedded" else "high",
+            F.append(_finding("lookalike-sender", "critical" if la["reason"] != "embedded" else "high",
                               f"Look-alike domain imitating {brand_label(la['brand'])}",
                               f"{from_domain} {kind}; the genuine domain is {la['legit_domain']}.", "identity"))
         brand = brand_in_text(name)
@@ -361,83 +388,83 @@ def analyze(text: str, from_file: bool = False) -> dict:
             legit = BRANDS[brand]
             if org_domain(from_domain) != org_domain(legit) and org_domain(from_domain) not in LEGIT_EXTRA \
                     and not org_domain(from_domain).startswith(brand + "."):
-                F.append(_finding("medium" if dmarc["result"] == "pass" else "high",
+                F.append(_finding("display-name-brand", "medium" if dmarc["result"] == "pass" else "high",
                                   f"Display name claims to be {brand_label(brand)}",
                                   f'Name "{name}" but sent from {from_domain}, not {legit}.', "identity"))
         if is_punycode(from_domain):
-            F.append(_finding("medium", "Sender domain uses punycode (IDN)",
+            F.append(_finding("sender-punycode", "medium", "Sender domain uses punycode (IDN)",
                               _idna(from_domain), "identity"))
         if org_domain(from_domain) in FREE_MAIL:
-            F.append(_finding("info", "Sent from a free webmail provider", from_domain, "identity"))
+            F.append(_finding("free-mail", "info", "Sent from a free webmail provider", from_domain, "identity"))
     elif items:
-        F.append(_finding("medium", "From header missing or unparseable", "", "identity"))
+        F.append(_finding("from-missing", "medium", "From header missing or unparseable", "", "identity"))
 
     for rt in reply_to:
         if rt["domain"] and from_domain and cousin_domain(rt["domain"], from_domain):
-            F.append(_finding("critical", "Reply-To imitates the sender's domain",
+            F.append(_finding("reply-to-cousin", "critical", "Reply-To imitates the sender's domain",
                               f"Replies go to {rt['domain']}, a look-alike of {from_domain}. This is typical of invoice and payroll fraud.",
                               "identity", "reply-to-cousin"))
             break
         if rt["domain"] and from_domain and not aligned(rt["domain"], from_domain):
-            F.append(_finding("medium", "Reply-To differs from From",
+            F.append(_finding("reply-to-mismatch", "medium", "Reply-To differs from From",
                               f"Replies go to {rt['address']} instead of {from_domain}.", "identity"))
             break
     if return_path and return_path["domain"] and from_domain and not aligned(return_path["domain"], from_domain):
-        F.append(_finding("info", "Return-Path differs from From",
+        F.append(_finding("return-path-mismatch", "info", "Return-Path differs from From",
                           f"Bounces go to {return_path['domain']} (common for mailing services).", "identity"))
     if sender_mb and sender_mb["domain"] and from_domain and not aligned(sender_mb["domain"], from_domain):
-        F.append(_finding("low", "Sender header differs from From", f"Sender: {sender_mb['address']}", "identity"))
+        F.append(_finding("sender-mismatch", "low", "Sender header differs from From", f"Sender: {sender_mb['address']}", "identity"))
 
     mid = summary["message_id"]
     if not mid and items:
-        F.append(_finding("medium", "Message-ID missing", "Legitimate mail servers almost always add one.", "message"))
+        F.append(_finding("message-id-missing", "medium", "Message-ID missing", "Legitimate mail servers almost always add one.", "message"))
     elif mid and from_domain:
         mdom = domain_of(mid.strip("<>"))
         if mdom and not aligned(mdom, from_domain) and not re.search(
                 r"(google|outlook|prod\.outlook|amazonses|sendgrid|mailgun|mandrillapp|sparkpost|"
                 r"mailchimp|mcsv|salesforce|exacttarget|mail\.gmail)", mdom):
-            F.append(_finding("info", "Message-ID domain differs from From", mdom, "message"))
+            F.append(_finding("message-id-mismatch", "info", "Message-ID domain differs from From", mdom, "message"))
 
     if summary["mailer"] and SUSPICIOUS_MAILERS.search(summary["mailer"]):
-        F.append(_finding("low", "Bulk or scripted mailer", summary["mailer"], "message"))
+        F.append(_finding("bulk-mailer", "low", "Bulk or scripted mailer", summary["mailer"], "message"))
     if summary["subject"] and URGENCY.search(summary["subject"]):
-        F.append(_finding("low", "Urgent or account-related wording in subject",
+        F.append(_finding("urgent-subject", "low", "Urgent or account-related wording in subject",
                           f'Matched "{URGENCY.search(summary["subject"]).group(0)}"', "message"))
     if not first("date") and items:
-        F.append(_finding("medium", "Date header missing", "", "message"))
+        F.append(_finding("date-missing", "medium", "Date header missing", "", "message"))
     elif not date_dt:
-        F.append(_finding("low", "Date header could not be parsed", first("date"), "message"))
+        F.append(_finding("date-unparseable", "low", "Date header could not be parsed", first("date"), "message"))
     elif timed:
         delta = (date_dt - timed[0].timestamp).total_seconds()
         if delta > 900:
-            F.append(_finding("low", "Date header is later than the first relay",
+            F.append(_finding("date-after-relay", "low", "Date header is later than the first relay",
                               f"By {int(delta // 60)} minutes — the Date may have been forged.", "message"))
         elif delta < -7 * 86400:
-            F.append(_finding("low", "Message was written long before it was sent",
+            F.append(_finding("date-old", "low", "Message was written long before it was sent",
                               f"{int(-delta // 86400)} days between Date and first relay.", "message"))
     if items and not summary["to"] and not hmap.get("to"):
-        F.append(_finding("low", "No To recipients", "Recipients were hidden (Bcc / undisclosed).", "message"))
+        F.append(_finding("no-recipients", "low", "No To recipients", "Recipients were hidden (Bcc / undisclosed).", "message"))
 
     # routing findings
     skewed = [h for h in hops if h.clock_skew]
     if skewed:
-        F.append(_finding("info", "Clock skew between relays",
+        F.append(_finding("clock-skew", "info", "Clock skew between relays",
                           "Hop " + ", ".join(f"{h.index} ({h.clock_skew:+.0f}s)" for h in skewed)
                           + " is timestamped before the previous hop — usually a mis-set server clock.", "routing"))
     slow = [h for h in hops if (h.delay or 0) >= 3600]
     if slow:
-        F.append(_finding("info", "Significant delivery delay",
+        F.append(_finding("delivery-delay", "info", "Significant delivery delay",
                           ", ".join(f"hop {h.index}: {_human(h.delay)}" for h in slow), "routing"))
     notz = [h for h in hops if h.timestamp and not h.timestamp_has_tz]
     if notz:
-        F.append(_finding("info", "Timestamps without a time zone",
+        F.append(_finding("no-timezone", "info", "Timestamps without a time zone",
                           "Assumed UTC for hop " + ", ".join(str(h.index) for h in notz) + ".", "routing"))
     ext = [h for h in hops if h.from_ip and is_public_ip(h.from_ip)]
     if ext and all(h.tls for h in ext):
-        F.append(_finding("pass", "Encrypted in transit", "Every relay from a public IP used TLS.", "routing"))
+        F.append(_finding("tls-all", "pass", "Encrypted in transit", "Every relay from a public IP used TLS.", "routing"))
     elif ext and any(not h.tls for h in ext):
         plain = [str(h.index) for h in ext if not h.tls]
-        F.append(_finding("info", "Some relays show no sign of TLS", "Hop " + ", ".join(plain), "routing"))
+        F.append(_finding("tls-partial", "info", "Some relays show no sign of TLS", "Hop " + ", ".join(plain), "routing"))
 
     ms = spam["microsoft"]
     try:
@@ -445,18 +472,18 @@ def analyze(text: str, from_file: bool = False) -> dict:
     except ValueError:
         scl = -1
     if scl >= 5:
-        F.append(_finding("medium", f"Microsoft 365 marked as spam (SCL {scl})", f"SFV={ms.get('SFV', '')} CAT={ms.get('CAT', '')}", "spam"))
+        F.append(_finding("ms-spam", "medium", f"Microsoft 365 marked as spam (SCL {scl})", f"SFV={ms.get('SFV', '')} CAT={ms.get('CAT', '')}", "spam"))
     if ms.get("CAT") in ("PHSH", "HPHSH", "HPHISH", "MALW", "SPOOF", "GIMP", "UIMP", "DIMP"):
-        F.append(_finding("high", f"Microsoft 365 category: {ms['CAT']}", "Microsoft's filter classified this message as phishing, spoofing, impersonation or malware.", "spam"))
+        F.append(_finding("ms-category", "high", f"Microsoft 365 category: {ms['CAT']}", "Microsoft's filter classified this message as phishing, spoofing, impersonation or malware.", "spam"))
     try:
         bcl = int(ms.get("BCL", "-1"))
     except ValueError:
         bcl = -1
     if bcl >= 7:
-        F.append(_finding("low", f"Bulk mail (BCL {bcl})", "", "spam"))
+        F.append(_finding("bulk-bcl", "low", f"Bulk mail (BCL {bcl})", "", "spam"))
     sa = spam["spamassassin"]
     if sa.get("flagged"):
-        F.append(_finding("medium", "Flagged as spam by SpamAssassin",
+        F.append(_finding("spamassassin", "medium", "Flagged as spam by SpamAssassin",
                           f"score {sa.get('score')}/{sa.get('required')}", "spam"))
 
     # ---------------------------------------------------------------- content
@@ -468,40 +495,40 @@ def analyze(text: str, from_file: bool = False) -> dict:
     if body:
         for a in body["attachments"]:
             if a["content_mismatch"] == "Windows executable" or a["double_extension"]:
-                F.append(_finding("critical", "Disguised attachment",
+                F.append(_finding("disguised-attachment", "critical", "Disguised attachment",
                                   f"{a['filename']}" + (" is really a Windows program" if a["content_mismatch"] == "Windows executable"
                                                         else " uses a double extension to hide its real type"), "content"))
             elif a["risky"]:
-                F.append(_finding("high", f"Risky attachment: {a['kind']}", a["filename"], "content"))
+                F.append(_finding("risky-attachment", "high", f"Risky attachment: {a['kind']}", a["filename"], "content"))
             elif a["kind"] == "archive":
-                F.append(_finding("low", "Archive attachment", f"{a['filename']} can hide its contents from scanners.", "content"))
+                F.append(_finding("archive-attachment", "low", "Archive attachment", f"{a['filename']} can hide its contents from scanners.", "content"))
         if body["password_field"] or any(f["action"] for f in body["forms"]):
-            F.append(_finding("high", "Message contains a login or data form",
+            F.append(_finding("credential-form", "high", "Message contains a login or data form",
                               "Legitimate services do not ask you to enter credentials inside an email or attachment.", "content"))
         groups = [
-            ("look-alike of", "critical", "Link to a look-alike domain"),
-            ("text shows", "high", "Link text does not match where it goes"),
-            ("script link", "high", "Script link in message"),
-            ("data: URI", "high", "Link opens an embedded page"),
-            ("file / network-share", "high", "Link to a file share"),
-            ("raw IP address", "medium", "Link points to a raw IP address"),
-            ("punycode", "medium", "Link uses a punycode domain"),
-            ("credentials-style @", "medium", "Link hides its real host after an @"),
-            ("free hosting", "medium", "Link to free hosting often used for phishing"),
-            ("URL shortener", "low", "Shortened link hides its destination"),
+            ("look-alike of", "link-lookalike", "critical", "Link to a look-alike domain"),
+            ("text shows", "link-text-mismatch", "high", "Link text does not match where it goes"),
+            ("script link", "script-link", "high", "Script link in message"),
+            ("data: URI", "data-uri-link", "high", "Link opens an embedded page"),
+            ("file / network-share", "file-share-link", "high", "Link to a file share"),
+            ("raw IP address", "raw-ip-link", "medium", "Link points to a raw IP address"),
+            ("punycode", "punycode-link", "medium", "Link uses a punycode domain"),
+            ("credentials-style @", "at-in-url", "medium", "Link hides its real host after an @"),
+            ("free hosting", "free-hosting-link", "medium", "Link to free hosting often used for phishing"),
+            ("URL shortener", "shortener-link", "low", "Shortened link hides its destination"),
         ]
-        for key, sev, title in groups:
+        for key, rule_key, sev, title in groups:
             hits = [lk for lk in body["links"] if any(f.startswith(key) or key in f for f in lk["flags"])]
             if hits:
                 eg = "; ".join(next(f for f in lk["flags"] if key in f) if key in ("text shows", "look-alike of") else (lk["host"] or lk["href"][:60])
                                for lk in hits[:3])
-                F.append(_finding(sev, title + (f" ({len(hits)})" if len(hits) > 1 else ""), eg, "content",
+                F.append(_finding(rule_key, sev, title + (f" ({len(hits)})" if len(hits) > 1 else ""), eg, "content",
                                   re.sub(r"[^a-z]+", "-", key).strip("-")))
         cousins = sorted({lk["host"] for lk in body["links"] if lk["host"] and cousin_domain(lk["host"], from_domain)})
         if cousins:
-            F.append(_finding("high", "Link to a look-alike of the sender's domain", ", ".join(cousins[:3]), "content", "link-cousin"))
+            F.append(_finding("link-cousin", "high", "Link to a look-alike of the sender's domain", ", ".join(cousins[:3]), "content", "link-cousin"))
         if body["link_count"] and from_domain and not any(lk["same_org_as_sender"] for lk in body["links"] if lk["host"]):
-            F.append(_finding("info", "No links point to the sender's own domain",
+            F.append(_finding("no-sender-links", "info", "No links point to the sender's own domain",
                               f"{len(body['domains'])} linked domain(s), none belong to {from_domain}.", "content"))
 
     # domain alignment table: everything that claims an identity, compared to From
@@ -530,17 +557,14 @@ def analyze(text: str, from_file: bool = False) -> dict:
     authn["alignment"] = alignment
 
     # ----------------------------------------------------------------- score
+    cfg = config or get_config()
     order = ["critical", "high", "medium", "low", "info", "pass"]
+    F = _finalize(F, cfg)
     F.sort(key=lambda f: order.index(f["severity"]))
-    score = min(100, sum(SEVERITY_WEIGHT[f["severity"]] for f in F))
-    if any(f["severity"] == "critical" for f in F):
-        score = max(score, 80)
-    if score >= 60:
-        level, label = "high", "High risk"
-    elif score >= 25:
-        level, label = "medium", "Suspicious"
-    else:
-        level, label = "low", "Low risk"
+    score = min(100, sum(f["weight"] for f in F))
+    if cfg.critical_floor is not None and any(f["severity"] == "critical" for f in F):
+        score = max(score, cfg.critical_floor)
+    level, label = cfg.level(score)
     if not items:
         level, label = "none", "No data"
 
@@ -561,7 +585,7 @@ def analyze(text: str, from_file: bool = False) -> dict:
         "stats": {"header_count": len(items), "hop_count": len(hops),
                   "findings": {s: sum(1 for f in F if f["severity"] == s) for s in order}},
         "meta": {"analyzed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                 "geoip": geo.database_info()},
+                 "geoip": geo.database_info(), "scoring": cfg.describe()},
     }
 
 
