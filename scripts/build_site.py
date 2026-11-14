@@ -33,7 +33,9 @@ PYODIDE_SHA256 = "ab08aafc11a3c9a0fe73825eb2cec78bda9464348dd17414e7ec0132ef3451
 PYODIDE_FILES = ("pyodide.js", "pyodide.asm.js", "pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json")
 
 # Runtime dependencies of esha.core (geo uses maxminddb's pure-Python reader).
-PY_DEPS = ("publicsuffixlist", "dateutil", "six", "tzdata", "maxminddb")
+PY_DEPS = ("publicsuffixlist", "dateutil", "maxminddb")
+# Dependencies of those that only some versions need; bundled when installed.
+PY_DEPS_OPTIONAL = ("six", "tzdata")
 SKIP_SUFFIXES = (".so", ".pyd", ".dylib", ".pyc", ".pyi")
 
 
@@ -79,8 +81,13 @@ def build_bundle(dest: Path) -> None:
         _add_tree(zf, ROOT / "esha" / "core", "esha/core")
         for mmdb in sorted((ROOT / "esha" / "static" / "data").glob("*.mmdb")):
             zf.write(mmdb, f"esha/static/data/{mmdb.name}")
-        for name in PY_DEPS:
-            mod = importlib.import_module(name)
+        for name in PY_DEPS + PY_DEPS_OPTIONAL:
+            try:
+                mod = importlib.import_module(name)
+            except ImportError:
+                if name in PY_DEPS:
+                    raise
+                continue
             path = Path(mod.__file__)
             if path.name == "__init__.py":
                 _add_tree(zf, path.parent, name)
