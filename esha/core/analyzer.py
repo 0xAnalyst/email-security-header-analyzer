@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from email.parser import HeaderParser
 
 from . import auth as A
-from . import geo
+from . import esp, geo
 from .body import analyze_body
 from .domains import (
     FREE_MAIL,
@@ -269,6 +269,39 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
     }
     spam = {"microsoft": A.parse_ms_antispam(hmap), "spamassassin": A.parse_spam_status(hmap)}
 
+    # Email service provider, so expected envelope / DKIM / Message-ID mismatches can be explained.
+    esp_info = esp.detect(
+        hmap, envelope=spf["domain"] or (return_path or {}).get("domain", ""),
+        dkim_domains=[x["domain"] for x in dkim_results] or [sg["domain"] for sg in dkim_sigs],
+        message_id_domain=domain_of(summary["message_id"].strip("<>")),
+        relay_hosts=[(origin or {}).get("host", "").lower(),
+                     (origin or {}).get("detail", "").split("[")[0].strip().rstrip(".").lower()])
+    summary["esp"] = esp_info
+
+    # Mailing lists legitimately set Reply-To/Sender to the list and break DKIM with footers.
+    list_id = " ".join(hmap.get("list-id", []))
+    m_list = re.search(r"<([^<>\s]+)>", list_id)
+    list_domain = (m_list.group(1) if m_list else "").lower()
+    is_list = bool(list_domain) or " ".join(hmap.get("precedence", [])).strip().lower() == "list"
+    original_sender = domain_of(first("x-original-sender") or "")
+
+    def list_identity(domain: str) -> bool:
+        """True if ``domain`` is the mailing list itself or the list's original poster.
+
+        Only when DMARC passes: List-Id is sender-controlled, so a spoofer could add one."""
+        return bool(is_list and dmarc["result"] == "pass" and domain and ((list_domain and aligned(domain, list_domain)) or
+                                            (original_sender and aligned(domain, original_sender))))
+
+    def esp_note(domain: str) -> str:
+        """Explain a mismatching domain that belongs to the detected ESP."""
+        owner = esp.esp_of_domain(domain)
+        if not owner:
+            return ""
+        if dmarc["result"] == "pass":
+            return f" {domain} belongs to {owner}; this is expected when an organisation sends through {owner}."
+        return (f" {domain} belongs to {owner}, and anyone with a {owner} account gets this pass. "
+                f"It says nothing about whether {from_domain} sent the message.")
+
     # ----------------------------------------------------------- indicators
     F: list[dict] = []
     if not items:
@@ -303,7 +336,8 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
     elif spf["result"] == "pass":
         F.append(_finding("spf-mismatch", "info" if dmarc_ok else "medium", "SPF passed for a different domain",
                           f"The server is authorised to send for {spf['domain'] or 'the envelope domain'}, not for the From domain {from_domain}."
-                          + ("" if dmarc_ok else " An SPF pass on an unrelated domain is a common way to make spoofed mail look authenticated."),
+                          + (esp_note(spf["domain"]) or ("" if dmarc_ok else
+                             " An SPF pass on an unrelated domain is a common way to make spoofed mail look authenticated.")),
                           "authentication", "spf-mismatch"))
     elif spf["result"] in ("fail", "hardfail"):
         F.append(_finding("spf-fail", "high", "SPF failed", f"The sending server is not authorised to send for {spf['domain'] or 'the envelope domain'}.", "authentication"))
@@ -319,10 +353,15 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
         signers = ", ".join(sorted({x["domain"] for x in dkim_results if x["result"] == "pass"}))
         F.append(_finding("dkim-mismatch", "info" if dmarc_ok else "medium", "DKIM signed by a different domain",
                           f"Valid signature from {signers}, but none from {from_domain}."
-                          + ("" if dmarc_ok else " The signature proves who sent it, and it isn't the domain shown in From."),
+                          + ("".join(esp_note(d) for d in sorted({x["domain"] for x in dkim_results if x["result"] == "pass"}))
+                             or ("" if dmarc_ok else " The signature proves who sent it, and it isn't the domain shown in From.")),
                           "authentication", "dkim-mismatch"))
     elif dkim_result in ("fail", "permerror", "temperror", "neutral", "policy"):
-        F.append(_finding("dkim-fail", "medium", f"DKIM {dkim_result}", "A DKIM signature was present but did not verify — the message may have been altered.", "authentication"))
+        list_broke_it = is_list and arc["result"] == "pass"
+        F.append(_finding("dkim-fail", "info" if list_broke_it else "medium", f"DKIM {dkim_result}",
+                          "The author's signature was broken by the mailing list (it adds a footer or subject tag); "
+                          "the ARC seal shows authentication passed before the list changed it." if list_broke_it else
+                          "A DKIM signature was present but did not verify — the message may have been altered.", "authentication"))
     elif dkim_result == "none" and items:
         F.append(_finding("dkim-none", "low", "Message is not DKIM-signed", "", "authentication"))
     if dkim_result == "unverified":
@@ -406,14 +445,19 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
                               "identity", "reply-to-cousin"))
             break
         if rt["domain"] and from_domain and not aligned(rt["domain"], from_domain):
-            F.append(_finding("reply-to-mismatch", "medium", "Reply-To differs from From",
-                              f"Replies go to {rt['address']} instead of {from_domain}.", "identity"))
+            via_list = list_identity(rt["domain"])
+            F.append(_finding("reply-to-mismatch", "info" if via_list else "medium", "Reply-To differs from From",
+                              f"Replies go to {rt['address']} instead of {from_domain}"
+                              + (" (normal for a mailing list)." if via_list else "."), "identity"))
             break
     if return_path and return_path["domain"] and from_domain and not aligned(return_path["domain"], from_domain):
         F.append(_finding("return-path-mismatch", "info", "Return-Path differs from From",
-                          f"Bounces go to {return_path['domain']} (common for mailing services).", "identity"))
+                          f"Bounces go to {return_path['domain']}"
+                          + (f" ({esp.esp_of_domain(return_path['domain'])} bounce handling)." if esp.esp_of_domain(return_path["domain"])
+                             else " (common for mailing services)."), "identity"))
     if sender_mb and sender_mb["domain"] and from_domain and not aligned(sender_mb["domain"], from_domain):
-        F.append(_finding("sender-mismatch", "low", "Sender header differs from From", f"Sender: {sender_mb['address']}", "identity"))
+        F.append(_finding("sender-mismatch", "info" if list_identity(sender_mb["domain"]) else "low",
+                          "Sender header differs from From", f"Sender: {sender_mb['address']}", "identity"))
 
     mid = summary["message_id"]
     if not mid and items:
@@ -422,7 +466,7 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
         mdom = domain_of(mid.strip("<>"))
         if mdom and not aligned(mdom, from_domain) and not re.search(
                 r"(google|outlook|prod\.outlook|amazonses|sendgrid|mailgun|mandrillapp|sparkpost|"
-                r"mailchimp|mcsv|salesforce|exacttarget|mail\.gmail)", mdom):
+                r"mailchimp|mcsv|salesforce|exacttarget|mail\.gmail)", mdom) and not esp.esp_of_domain(mdom):
             F.append(_finding("message-id-mismatch", "info", "Message-ID domain differs from From", mdom, "message"))
 
     if summary["mailer"] and SUSPICIOUS_MAILERS.search(summary["mailer"]):
@@ -444,6 +488,7 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
                               f"{int(-delta // 86400)} days between Date and first relay.", "message"))
     if items and not summary["to"] and not hmap.get("to"):
         F.append(_finding("no-recipients", "low", "No To recipients", "Recipients were hidden (Bcc / undisclosed).", "message"))
+    F.extend(_header_checks(hmap, summary, dmarc, dkim_sigs, spam, esp_info, from_domain, bool(items)))
 
     # routing findings
     skewed = [h for h in hops if h.clock_skew]
@@ -502,6 +547,7 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
                 F.append(_finding("risky-attachment", "high", f"Risky attachment: {a['kind']}", a["filename"], "content"))
             elif a["kind"] == "archive":
                 F.append(_finding("archive-attachment", "low", "Archive attachment", f"{a['filename']} can hide its contents from scanners.", "content"))
+        F.extend(_content_checks(body, summary, dmarc, from_domain))
         if body["password_field"] or any(f["action"] for f in body["forms"]):
             F.append(_finding("credential-form", "high", "Message contains a login or data form",
                               "Legitimate services do not ask you to enter credentials inside an email or attachment.", "content"))
@@ -587,6 +633,157 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
         "meta": {"analyzed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                  "geoip": geo.database_info(), "scoring": cfg.describe()},
     }
+
+
+REPLY_PREFIX = re.compile(r"^\s*(?:\[[^\]]{1,40}\]\s*)?(?:re|aw|sv|vs|antw|odp|rif|res|ynt)\s*(?:\[\d+\]|\(\d+\))?\s*[:\uff1a]",
+                          re.IGNORECASE)
+FWD_PREFIX = re.compile(r"^\s*(?:\[[^\]]{1,40}\]\s*)?(?:fwd?|fw|wg|tr|enc)\s*[:\uff1a]", re.IGNORECASE)
+_MSGID = re.compile(r"<([^<>@\s]{1,200}@[^<>\s]{1,200})>")
+
+
+def _header_checks(hmap, summary, dmarc, dkim_sigs, spam, esp_info, from_domain, has_headers) -> list[dict]:
+    """Header-only detections added in ESHA 1.1: ESP, DKIM signature quality, BIMI, threads, bulk mail."""
+    F: list[dict] = []
+    if esp_info:
+        F.append(_finding("esp-detected", "info", f"Sent through {esp_info['name']}",
+                          "Evidence: " + "; ".join(esp_info["evidence"][:4]) + "."))
+
+    # DKIM signature quality. Only signatures with a readable h= list are judged.
+    unsigned_from, partial_body, few = [], [], []
+    for sg in dkim_sigs:
+        hs = sg["signed_headers"]
+        d = sg["domain"] or "unknown domain"
+        if hs and "from" not in hs:
+            unsigned_from.append(f"d={d} signs {', '.join(dict.fromkeys(hs[:8]))} but not From")
+        elif hs and ("subject" not in hs or len(set(hs)) < 4):
+            few.append(f"d={d} signs only {', '.join(sorted(set(hs)))}")
+        if (sg.get("body_length") or "").strip():
+            partial_body.append(f"d={d} has l={sg['body_length'].strip()}: anything after the first "
+                                f"{sg['body_length'].strip()} bytes of the body is not covered")
+    if unsigned_from:
+        F.append(_finding("dkim-from-unsigned", "medium", "DKIM signature does not cover From", "; ".join(unsigned_from) + "."))
+    if partial_body:
+        F.append(_finding("dkim-body-length", "medium", "DKIM signature only covers part of the body (l= tag)",
+                          "; ".join(partial_body) + "."))
+    if few:
+        F.append(_finding("dkim-few-headers", "low", "DKIM signature covers few headers", "; ".join(few) + "."))
+
+    # BIMI: receivers add BIMI-Location / BIMI-Indicator only after DMARC passes.
+    bimi = [n for n in ("bimi-indicator", "bimi-location") if hmap.get(n)]
+    if bimi:
+        loc = re.search(r"\bl=\s*(https://[^\s;]+)", " ".join(hmap.get("bimi-location", [])))
+        if dmarc["result"] == "pass":
+            F.append(_finding("bimi-present", "info", "BIMI brand logo",
+                              f"{from_domain} has a verified BIMI logo" + (f" ({loc.group(1)})." if loc else ".")))
+        else:
+            F.append(_finding("bimi-unauthenticated", "medium", "BIMI header on unauthenticated mail",
+                              f"{' and '.join(h.upper() for h in bimi)} present while DMARC is {dmarc['result']}. "
+                              "The sender probably added it to borrow a brand logo."))
+
+    # Threads: fake replies and look-alike thread participants.
+    subject = summary["subject"] or ""
+    thread_hdrs = " ".join(hmap.get("in-reply-to", []) + hmap.get("references", []))
+    in_thread = bool(thread_hdrs.strip())
+    if has_headers and REPLY_PREFIX.match(subject) and not in_thread:
+        F.append(_finding("fake-reply", "low", "Subject looks like a reply, but the message isn't part of a thread",
+                          f'"{subject[:80]}" has a reply prefix but no In-Reply-To or References headers.'))
+    elif in_thread and subject and not REPLY_PREFIX.match(subject) and not FWD_PREFIX.match(subject):
+        F.append(_finding("thread-subject-mismatch", "info", "Thread headers with a new subject",
+                          f'"{subject[:80]}" is not a reply or forward, but the message references an earlier one.'))
+    if in_thread and from_domain:
+        participants = {domain_of(m) for m in _MSGID.findall(thread_hdrs)[:50]}
+        participants |= {m["domain"] for m in summary["to"] + summary["cc"]}
+        look = sorted({d for d in participants if d and cousin_domain(from_domain, d)})
+        if look:
+            F.append(_finding("thread-hijack-lookalike", "critical", "Reply from a look-alike of a thread participant's domain",
+                              f"{from_domain} imitates {', '.join(look[:3])}, which appears in the conversation."))
+
+    # Bulk mail and unsubscribe headers (Gmail/Yahoo bulk-sender rules, RFC 8058).
+    precedence = " ".join(hmap.get("precedence", [])).strip().lower()
+    try:
+        bcl = int(spam["microsoft"].get("BCL", "-1"))
+    except ValueError:
+        bcl = -1
+    bulk_why = ([f"Precedence: {precedence}"] if precedence in ("bulk", "list", "junk") else []) \
+        + (["List-Id header"] if hmap.get("list-id") else []) + ([f"Microsoft BCL {bcl}"] if bcl >= 4 else [])
+    unsub = " ".join(hmap.get("list-unsubscribe", []))
+    if bulk_why and not unsub.strip():
+        F.append(_finding("bulk-no-unsubscribe", "low", "Bulk mail without List-Unsubscribe",
+                          f"Marked as bulk ({', '.join(bulk_why)}) but there is no way to unsubscribe."))
+    if re.search(r"<\s*https?://", unsub, re.IGNORECASE) and not hmap.get("list-unsubscribe-post"):
+        F.append(_finding("unsubscribe-no-one-click", "info", "List-Unsubscribe without one-click",
+                          "No List-Unsubscribe-Post: List-Unsubscribe=One-Click header (RFC 8058)."))
+    return F
+
+
+def _content_checks(body, summary, dmarc, from_domain) -> list[dict]:
+    """Body detections added in ESHA 1.1: HTML smuggling, archives and disk images,
+    calendar invites, image-only / QR-code messages and tracking pixels."""
+    F: list[dict] = []
+    for a in body["attachments"]:
+        if a.get("smuggling"):
+            F.append(_finding("html-smuggling", "critical" if len(a["smuggling"]) >= 2 else "high",
+                              "HTML smuggling in attachment", f"{a['filename']}: {', '.join(a['smuggling'])}."))
+        c = a.get("container")
+        if not c:
+            continue
+        approx = "" if c["listing"] == "complete" else f" (from {c['listing']}; the listing may be incomplete)"
+        if c["encrypted"]:
+            F.append(_finding("encrypted-archive", "high", "Password-protected archive",
+                              f"{a['filename']} ({c['format']}) is encrypted, so its contents can't be scanned."
+                              + (" The message text appears to give the password." if body.get("password_in_text") else "")))
+        if c["nested"]:
+            F.append(_finding("nested-archive", "medium", "Archive inside an archive",
+                              f"{a['filename']} contains {', '.join(c['nested'][:3])}{approx}."))
+        if c["risky"]:
+            severe = any(r["severe"] for r in c["risky"])
+            F.append(_finding("risky-file-in-container", "critical" if severe else "high",
+                              "Risky file inside archive or disk image",
+                              f"{a['filename']} ({c['format']}) contains "
+                              + ", ".join(r["name"] for r in c["risky"][:4])
+                              + (f" and {len(c['risky']) - 4} more" if len(c["risky"]) > 4 else "") + approx + "."))
+
+    for cal in body.get("calendar", []):
+        org = domain_of(cal["organizer"])
+        external = bool(org and from_domain and not aligned(org, from_domain))
+        if external:
+            F.append(_finding("ics-external-organiser", "medium", "Calendar invite from an outside organiser",
+                              f"Organiser {cal['organizer']} is not part of the sender's domain {from_domain}"
+                              + (f' ("{cal["summary"]}")' if cal["summary"] else "") + "."))
+        if cal["links"]:
+            trusted = not external and dmarc["result"] == "pass"
+            F.append(_finding("ics-links", "info" if trusted else "low", "Links in a calendar invite",
+                              ", ".join(_host_of(u) or u[:60] for u in cal["links"][:3])
+                              + (f" and {len(cal['links']) - 3} more" if len(cal["links"]) > 3 else "") + "."))
+        if external or cal["links"]:
+            break  # one invite is enough to report
+
+    imgs = body.get("images") or {}
+    has_images = bool(imgs.get("html_images") or imgs.get("inline_parts") or imgs.get("attached"))
+    qr = body.get("qr_wording") or ""
+    subject_qr = QR_SUBJECT.search(summary["subject"] or "")
+    if has_images and (qr or subject_qr):
+        F.append(_finding("qr-lure", "medium" if dmarc["result"] == "pass" else "high", "Message asks you to scan a QR code",
+                          f'The message says "{(qr or subject_qr.group(0))[:60]}" and contains an image.'
+                          + ("" if dmarc["result"] == "pass" else " The sender is not authenticated.")))
+    if has_images and body.get("text_words", 0) < 25 and body["link_count"] <= 2:
+        F.append(_finding("image-only", "low", "Message is mostly an image",
+                          f"{body.get('text_words', 0)} words of text and {body['link_count']} link(s); "
+                          "the content is in images that filters can't read."))
+    if imgs.get("remote"):
+        F.append(_finding("tracking-pixel", "info", "Remote images and tracking pixels",
+                          f"{imgs['remote']} remote image(s) from {', '.join(imgs['remote_hosts'][:3]) or 'other servers'}"
+                          + (f"; {imgs['tracking_pixels']} look like tracking pixels" if imgs.get("tracking_pixels") else "")
+                          + ". Loading them tells the sender the message was opened."))
+    return F
+
+
+QR_SUBJECT = re.compile(r"\bqr[\s-]?code\b|\bscan\b.{0,20}\b(code|qr)\b", re.IGNORECASE)
+
+
+def _host_of(url: str) -> str:
+    m = re.match(r"https?://([^/:?#\s]+)", url, re.IGNORECASE)
+    return m.group(1).lower() if m else ""
 
 
 def _looks_ip(text: str) -> bool:

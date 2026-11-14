@@ -1,0 +1,37 @@
+Delivered-To: analyst@example.com
+Received: by 2002:a05:7300:9c11:b0:12f:3a51:77e2 with SMTP id r17csp551201dyb;
+        Fri, 13 Nov 2026 09:20:01 -0800 (PST)
+Return-Path: <bounce+5f2e1c.9a-analyst=example.com@mg.wingtip.example>
+Received: from m228-4.mailgun.net (m228-4.mailgun.net. [159.135.228.4])
+        by mx.google.com with ESMTPS id 5b1f17b1804b1-43a1c2d3e4fsi118842f8f.211.2026.11.13
+        for <analyst@example.com>
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Fri, 13 Nov 2026 09:20:01 -0800 (PST)
+Received-SPF: pass (google.com: domain of bounce+5f2e1c.9a-analyst=example.com@mg.wingtip.example designates 159.135.228.4 as permitted sender) client-ip=159.135.228.4;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@mg.wingtip.example header.s=krs header.b=dGVzdA==;
+       spf=pass (google.com: domain of bounce+5f2e1c.9a-analyst=example.com@mg.wingtip.example designates 159.135.228.4 as permitted sender) smtp.mailfrom="bounce+5f2e1c.9a-analyst=example.com@mg.wingtip.example";
+       dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=wingtip.example
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=mg.wingtip.example; s=krs; t=1794650000;
+        h=Content-Transfer-Encoding:Content-Type:MIME-Version:Subject:Message-Id:To:From:Sender:Date;
+        bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;
+        b=eS1TaGEtc3ludGhldGljLXNpZ25hdHVyZS1mb3ItdGVzdHMtb25seQ==
+Sender: notifications@mg.wingtip.example
+From: Wingtip Projects <notifications@wingtip.example>
+To: analyst@example.com
+Subject: Maria commented on Website redesign
+Date: Fri, 13 Nov 2026 17:19:58 +0000
+Message-Id: <20261113171958.6f1a2b3c4d5e6f70@mg.wingtip.example>
+In-Reply-To: <task-5512@app.wingtip.example>
+References: <task-5512@app.wingtip.example>
+X-Mailgun-Sid: WyI1ZjJlMWMiLCAiYW5hbHlzdEBleGFtcGxlLmNvbSIsICI5YSJd
+List-Unsubscribe: <https://app.wingtip.example/settings/notifications>
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+TWFyaWEgY29tbWVudGVkIG9uIHRoZSB0YXNrICJXZWJzaXRlIHJlZGVzaWduIjoKCiJUaGUgbmV3
+IGhlYWRlciBsb29rcyBncmVhdC4gQ2FuIHdlIHRyeSB0aGUgZGFya2VyIGJsdWUgZm9yIHRoZSBi
+dXR0b25zIGJlZm9yZSBGcmlkYXkncyByZXZpZXc/IgoKUmVwbHkgaW4gV2luZ3RpcDogaHR0cHM6
+Ly9hcHAud2luZ3RpcC5leGFtcGxlL3QvNTUxMgoKWW91IGdldCB0aGlzIGVtYWlsIGJlY2F1c2Ug
+eW91IGZvbGxvdyB0aGlzIHRhc2su

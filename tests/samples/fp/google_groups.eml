@@ -1,0 +1,37 @@
+Delivered-To: analyst@example.com
+Received: by 2002:a05:7300:9c11:b0:12f:3a51:77e2 with SMTP id r17csp551201dyb;
+        Fri, 13 Nov 2026 05:05:45 -0800 (PST)
+Return-Path: <volunteers+bncBC@googlegroups.com>
+Received: from mail-sor-f97.google.com (mail-sor-f97.google.com. [209.85.220.97])
+        by mx.google.com with ESMTPS id 5b1f17b1804b1-43a1c2d3e4fsi118842f8f.211.2026.11.13
+        for <analyst@example.com>
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Fri, 13 Nov 2026 05:05:45 -0800 (PST)
+Received-SPF: pass (google.com: domain of volunteers+bncBC@googlegroups.com designates 209.85.220.97 as permitted sender) client-ip=209.85.220.97;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@googlegroups.com header.s=20230601 header.b=dGVzdA==;
+       spf=pass (google.com: domain of volunteers+bncBC@googlegroups.com designates 209.85.220.97 as permitted sender) smtp.mailfrom=volunteers+bncBC@googlegroups.com;
+       dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=googlegroups.com
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=googlegroups.com; s=20230601; t=1794650000;
+        h=x-original-sender:list-unsubscribe:list-subscribe:list-archive:list-help:list-post:list-id:mailing-list:precedence:message-id:date:subject:to:from:mime-version:sender:from:to:cc:subject:date;
+        bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;
+        b=eS1TaGEtc3ludGhldGljLXNpZ25hdHVyZS1mb3ItdGVzdHMtb25seQ==
+From: 'Leila Haddad' via Riverside Volunteers <volunteers@googlegroups.com>
+To: Riverside Volunteers <volunteers@googlegroups.com>
+Reply-To: Leila Haddad <leila@example.org>
+Subject: Saturday clean-up: meeting point moved
+Date: Fri, 13 Nov 2026 13:05:40 +0000
+Message-ID: <b6c0a1e2-77f3-4c1d-9e0a-2f51c3d4e5f6n@googlegroups.com>
+X-Original-Sender: leila@example.org
+Precedence: list
+Mailing-list: list volunteers@googlegroups.com
+List-ID: <volunteers.googlegroups.com>
+List-Unsubscribe: <mailto:volunteers+unsubscribe@googlegroups.com>, <https://groups.google.com/g/volunteers/subscribe>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+SGkgYWxsLAoKVGhlIHBhcmsgZ2F0ZSBpcyBjbG9zZWQgZm9yIHJlcGFpcnMsIHNvIHdlJ2xsIG1l
+ZXQgYXQgdGhlIGJvYXRob3VzZSBjYXIgcGFyayBpbnN0ZWFkLiBTYW1lIHRpbWUsIDlhbS4gR2xv
+dmVzIGFuZCBiYWdzIHByb3ZpZGVkLgoKTGVpbGE=

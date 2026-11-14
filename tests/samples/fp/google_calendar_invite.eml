@@ -1,0 +1,55 @@
+Delivered-To: analyst@example.com
+Received: by 2002:a05:7300:9c11:b0:12f:3a51:77e2 with SMTP id r17csp551201dyb;
+        Fri, 13 Nov 2026 04:00:12 -0800 (PST)
+Return-Path: <sam.lee@example.com>
+Received: from mail-sor-f69.google.com (mail-sor-f69.google.com. [209.85.220.69])
+        by mx.google.com with ESMTPS id 5b1f17b1804b1-43a1c2d3e4fsi118842f8f.211.2026.11.13
+        for <analyst@example.com>
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Fri, 13 Nov 2026 04:00:12 -0800 (PST)
+Received-SPF: pass (google.com: domain of sam.lee@example.com designates 209.85.220.69 as permitted sender) client-ip=209.85.220.69;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@example.com header.s=google header.b=dGVzdA==;
+       spf=pass (google.com: domain of sam.lee@example.com designates 209.85.220.69 as permitted sender) smtp.mailfrom=sam.lee@example.com;
+       dmarc=pass (p=QUARANTINE sp=QUARANTINE dis=NONE) header.from=example.com
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com; s=google; t=1794650000;
+        h=mime-version:reply-to:sender:message-id:date:subject:from:to;
+        bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;
+        b=eS1TaGEtc3ludGhldGljLXNpZ25hdHVyZS1mb3ItdGVzdHMtb25seQ==
+Reply-To: Sam Lee <sam.lee@example.com>
+Sender: Google Calendar <calendar-notification@google.com>
+From: Sam Lee <sam.lee@example.com>
+To: analyst@example.com
+Subject: Invitation: Vendor shortlist sync @ Tue 17 Nov 2026 14:00 - 14:30 (GMT)
+Date: Fri, 13 Nov 2026 12:00:12 +0000
+Message-ID: <calendar-3m1o2r9a0b4c@google.com>
+Content-Type: multipart/alternative; boundary="esha-sample-boundary"
+MIME-Version: 1.0
+
+--esha-sample-boundary
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+U2FtIExlZSBoYXMgaW52aXRlZCB5b3UgdG86IFZlbmRvciBzaG9ydGxpc3Qgc3luYy4gSm9pbiB3
+aXRoIEdvb2dsZSBNZWV0OiBodHRwczovL21lZXQuZ29vZ2xlLmNvbS9hYmMtZGVmZy1oaWo=
+
+--esha-sample-boundary
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+Content-Type: text/calendar; charset="utf-8"; method="REQUEST"
+
+QkVHSU46VkNBTEVOREFSDQpQUk9ESUQ6LS8vR29vZ2xlIEluYy8vR29vZ2xlIENhbGVuZGFyIDcw
+LjkwNTQvL0VODQpWRVJTSU9OOjIuMA0KQ0FMU0NBTEU6R1JFR09SSUFODQpNRVRIT0Q6UkVRVUVT
+VA0KQkVHSU46VkVWRU5UDQpEVFNUQVJUOjIwMjYxMTE3VDE0MDAwMFoNCkRURU5EOjIwMjYxMTE3
+VDE0MzAwMFoNCkRUU1RBTVA6MjAyNjExMTNUMTIwMDAwWg0KT1JHQU5JWkVSO0NOPVNhbSBMZWU6
+bWFpbHRvOnNhbS5sZWVAZXhhbXBsZS5jb20NClVJRDozbTFvMnI5YTBiNGNAZ29vZ2xlLmNvbQ0K
+QVRURU5ERUU7Q1VUWVBFPUlORElWSURVQUw7Uk9MRT1SRVEtUEFSVElDSVBBTlQ7UEFSVFNUQVQ9
+TkVFRFMtQUNUSU9OO1JTVlA9VFJVRTtDTj1hbmFseXN0QGV4YW1wbGUuY29tOm1haWx0bzphbmFs
+eXN0QGV4YW1wbGUuY29tDQpYLUdPT0dMRS1DT05GRVJFTkNFOmh0dHBzOi8vbWVldC5nb29nbGUu
+Y29tL2FiYy1kZWZnLWhpag0KREVTQ1JJUFRJT046V2Vla2x5IHN5bmMgb24gdGhlIHZlbmRvciBz
+aG9ydGxpc3QuXG5cbkpvaW4gd2l0aCBHb29nbGUgTWVldDogaHR0cHM6Ly9tZWV0Lmdvb2dsZS5j
+b20vYWJjLWRlZmctaGlqDQpTVU1NQVJZOlZlbmRvciBzaG9ydGxpc3Qgc3luYw0KU1RBVFVTOkNP
+TkZJUk1FRA0KRU5EOlZFVkVOVA0KRU5EOlZDQUxFTkRBUg0K
+
+--esha-sample-boundary--

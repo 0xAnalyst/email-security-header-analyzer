@@ -1,0 +1,60 @@
+Delivered-To: analyst@example.com
+Received: by 2002:a05:7300:9c11:b0:12f:3a51:77e2 with SMTP id r17csp551201dyb;
+        Fri, 13 Nov 2026 07:00:44 -0800 (PST)
+Return-Path: <bounce-71_HTML-1234567-88221-7001234-12@bounce.email.adventure-works.example>
+Received: from mta.email.adventure-works.example (mta.email.adventure-works.example. [13.111.4.20])
+        by mx.google.com with ESMTPS id 5b1f17b1804b1-43a1c2d3e4fsi118842f8f.211.2026.11.13
+        for <analyst@example.com>
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Fri, 13 Nov 2026 07:00:44 -0800 (PST)
+Received-SPF: pass (google.com: domain of bounce-71_HTML-1234567-88221-7001234-12@bounce.email.adventure-works.example designates 13.111.4.20 as permitted sender) client-ip=13.111.4.20;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@email.adventure-works.example header.s=200608 header.b=dGVzdA==;
+       spf=pass (google.com: domain of bounce-71_HTML-1234567-88221-7001234-12@bounce.email.adventure-works.example designates 13.111.4.20 as permitted sender) smtp.mailfrom=bounce-71_HTML-1234567-88221-7001234-12@bounce.email.adventure-works.example;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=email.adventure-works.example
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=email.adventure-works.example; s=200608; t=1794650000;
+        h=From:To:Subject:Date:List-Unsubscribe:MIME-Version:Reply-To:Message-ID:Content-Type;
+        bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;
+        b=eS1TaGEtc3ludGhldGljLXNpZ25hdHVyZS1mb3ItdGVzdHMtb25seQ==
+From: Adventure Works <news@email.adventure-works.example>
+Reply-To: reply@email.adventure-works.example
+To: analyst@example.com
+Subject: Your winter trip planner is here
+Date: Fri, 13 Nov 2026 15:00:40 +0000
+Message-ID: <0b1c2d3e-4f50-6172-8394-a5b6c7d8e9f0@atl1s07mta2043.xt.local>
+List-Unsubscribe: <https://click.email.adventure-works.example/subscription_center.aspx?jwt=eyJ>
+x-sfmc-stack: 7
+x-job: 7001234_88221
+Content-Type: multipart/alternative; boundary="esha-alt-boundary"
+MIME-Version: 1.0
+
+--esha-alt-boundary
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+WW91ciB3aW50ZXIgdHJpcCBwbGFubmVyIGlzIGhlcmU6IHJvdXRlcywgcGFja2luZyBsaXN0cyBh
+bmQgaHV0IG9wZW5pbmcgdGltZXMuIGh0dHBzOi8vd3d3LmFkdmVudHVyZS13b3Jrcy5leGFtcGxl
+L3dpbnRlcg==
+
+--esha-alt-boundary
+Content-Type: text/html; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+PGh0bWw+PGJvZHk+PGltZyBzcmM9Imh0dHBzOi8vY2xpY2suZW1haWwuYWR2ZW50dXJlLXdvcmtz
+LmV4YW1wbGUvbG9nby5wbmciIHdpZHRoPSIxODAiIGhlaWdodD0iNDAiIGFsdD0iQWR2ZW50dXJl
+IFdvcmtzIj48aDE+TmV3IHRoaXMgd2VlazwvaDE+PHA+SGVsbG8sIGhlcmUgaXMgd2hhdCBpcyBu
+ZXcgaW4gdGhlIEFkdmVudHVyZSBXb3JrcyBjYXRhbG9ndWUgdGhpcyB3ZWVrOiB3aW50ZXIgamFj
+a2V0cywgdHJhaWwgc2hvZXMgYW5kIGEgZ3VpZGUgdG8gbGF5ZXJpbmcgZm9yIGNvbGQgbW9ybmlu
+Z3MuIE1lbWJlcnMgZ2V0IGZyZWUgcmV0dXJucyB1bnRpbCB0aGUgZW5kIG9mIHRoZSBtb250aCwg
+YW5kIG91ciBzdG9yZXMgbm93IG9wZW4gYXQgbmluZSBvbiB3ZWVrZW5kcy48L3A+PHA+PGEgaHJl
+Zj0iaHR0cHM6Ly9jbGljay5lbWFpbC5hZHZlbnR1cmUtd29ya3MuZXhhbXBsZS90cmFjay9jbGlj
+az91PTEiPlNob3AgdGhlIGNvbGxlY3Rpb248L2E+PC9wPjxwPjxhIGhyZWY9Imh0dHBzOi8vd3d3
+LmFkdmVudHVyZS13b3Jrcy5leGFtcGxlL3dpbnRlciI+T3BlbiB0aGUgdHJpcCBwbGFubmVyPC9h
+PjwvcD48cD48YSBocmVmPSJodHRwczovL2NsaWNrLmVtYWlsLmFkdmVudHVyZS13b3Jrcy5leGFt
+cGxlL3Vuc3Vic2NyaWJlP3U9MSI+VW5zdWJzY3JpYmU8L2E+PC9wPjxpbWcgc3JjPSJodHRwczov
+L2NsaWNrLmVtYWlsLmFkdmVudHVyZS13b3Jrcy5leGFtcGxlL3RyYWNrL29wZW4ucGhwP3U9MSIg
+d2lkdGg9IjEiIGhlaWdodD0iMSIgYWx0PSIiPjwvYm9keT48L2h0bWw+
+
+--esha-alt-boundary--

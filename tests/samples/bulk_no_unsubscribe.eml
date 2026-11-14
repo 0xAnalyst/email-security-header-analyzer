@@ -1,0 +1,45 @@
+Delivered-To: analyst@example.com
+Received: by 2002:a05:7300:9c11:b0:12f:3a51:77e2 with SMTP id r17csp551201dyb;
+        Fri, 13 Nov 2026 01:03:55 -0800 (PST)
+Return-Path: <offers@promo-blast.example>
+Received: from out3.promo-blast.example (out3.promo-blast.example. [80.94.95.201])
+        by mx.google.com with ESMTPS id 5b1f17b1804b1-43a1c2d3e4fsi118842f8f.211.2026.11.13
+        for <analyst@example.com>
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Fri, 13 Nov 2026 01:03:55 -0800 (PST)
+Received-SPF: pass (google.com: domain of offers@promo-blast.example designates 80.94.95.201 as permitted sender) client-ip=80.94.95.201;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@promo-blast.example header.s=m1 header.b=dGVzdA==;
+       spf=pass (google.com: domain of offers@promo-blast.example designates 80.94.95.201 as permitted sender) smtp.mailfrom=offers@promo-blast.example;
+       dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=promo-blast.example
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=promo-blast.example; s=m1; t=1794650000;
+        h=from:to:date;
+        bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;
+        b=eS1TaGEtc3ludGhldGljLXNpZ25hdHVyZS1mb3ItdGVzdHMtb25seQ==
+From: Deals <offers@promo-blast.example>
+To: analyst@example.com
+Subject: Final hours: 80% off everything
+Date: Fri, 13 Nov 2026 09:03:30 +0000
+Message-ID: <blast.991@promo-blast.example>
+Precedence: bulk
+List-Id: Deals <deals.promo-blast.example>
+Content-Type: multipart/alternative; boundary="esha-alt-boundary"
+MIME-Version: 1.0
+
+--esha-alt-boundary
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+RmluYWwgaG91cnM6IDgwJSBvZmYgZXZlcnl0aGluZy4gaHR0cHM6Ly9wcm9tby1ibGFzdC5leGFt
+cGxlL3NhbGU=
+
+--esha-alt-boundary
+Content-Type: text/html; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+PHA+RmluYWwgaG91cnM6IDxhIGhyZWY9Imh0dHBzOi8vcHJvbW8tYmxhc3QuZXhhbXBsZS9zYWxl
+Ij44MCUgb2ZmIGV2ZXJ5dGhpbmc8L2E+PC9wPg==
+
+--esha-alt-boundary--

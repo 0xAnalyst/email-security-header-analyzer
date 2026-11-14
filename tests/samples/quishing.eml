@@ -1,0 +1,55 @@
+Received: from AM9PR04MB7709.eurprd04.prod.outlook.com (2603:10a6:20b:3d1::19) by
+ PA4PR04MB9222.eurprd04.prod.outlook.com with HTTPS; Fri, 13 Nov 2026 13:31:08 +0000
+Authentication-Results: spf=softfail (sender IP is 103.151.172.66)
+ smtp.mailfrom=it-helpdesk.example; dkim=none (message not signed)
+ header.d=none;dmarc=fail action=none
+ header.from=example.com;compauth=fail reason=601
+Received-SPF: SoftFail (protection.outlook.com: domain of transitioning
+ it-helpdesk.example discourages use of 103.151.172.66 as permitted sender)
+Received: from host-103-151-172-66.static.example (103.151.172.66) by
+ AM9PR04MB7709.mail.protection.outlook.com (10.167.242.68) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.8137.20;
+ Fri, 13 Nov 2026 13:31:07 +0000
+From: IT Service Desk <servicedesk@example.com>
+To: analyst@example.com
+Subject: RE: Action required: MFA re-registration
+Date: Fri, 13 Nov 2026 13:30:51 +0000
+Message-ID: <qr.20261113133051@it-helpdesk.example>
+Content-Type: multipart/related; boundary="esha-sample-boundary"
+MIME-Version: 1.0
+
+--esha-sample-boundary
+Content-Type: multipart/alternative; boundary="esha-alt-boundary"
+MIME-Version: 1.0
+
+--esha-alt-boundary
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+UmUtYXV0aGVudGljYXRlIE1GQS4gU2NhbiB0aGUgUVIgY29kZSB3aXRoIHlvdXIgcGhvbmUu
+
+--esha-alt-boundary
+Content-Type: text/html; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+PGh0bWw+PGJvZHk+PHA+UmUtYXV0aGVudGljYXRlIE1GQTwvcD48aW1nIHNyYz0iY2lkOnFyMDAx
+IiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgYWx0PSIiPjxwPlNjYW4gdGhlIFFSIGNvZGUgd2l0
+aCB5b3VyIHBob25lLjwvcD48L2JvZHk+PC9odG1sPg==
+
+--esha-alt-boundary--
+
+--esha-sample-boundary
+Content-Type: image/png
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+Content-ID: <qr001>
+Content-Disposition: inline; filename="qr.png"
+
+iVBORw0KGgoAAAANSUhEUgAAAFQAAABUCAAAAAA5AE8dAAAAnklEQVR42u2YsRKAMAhD+f+frouD
+p4WSgoMmmdqq7zwJ0mIWaJyajW1XJNAx0X19Nb+uC/r88NFDUcAEzUM98wtaC5Q3F9SHrn4o2euC
+qkS/AR1JQfcK2i526Mrku2NmaPcbCqrcV+5/J/fRwtdm/p9CO/ZZ0MaXBFoNTJhRxFDkwJsyv6Bw
+sytlfkGhZlfZ/ARQpNGdNj8xVHW/FXoAngcuz4xIfscAAAAASUVORK5CYII=
+
+--esha-sample-boundary--

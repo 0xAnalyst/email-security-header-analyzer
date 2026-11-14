@@ -264,3 +264,12 @@ def test_static_bundle_contains_engine_and_pure_python_deps(tmp_path):
             "publicsuffixlist/__init__.py", "dateutil/parser/__init__.py"} <= names
     assert not any(n.endswith((".so", ".pyd", ".pyc")) for n in names), "the browser cannot load native extensions"
     assert not any(n.startswith(("esha/app", "flask/")) for n in names)
+
+
+def test_fake_list_id_does_not_soften_reply_to_on_spoofed_mail():
+    text = ("Authentication-Results: mx.example.com; spf=fail smtp.mailfrom=bank.example; dmarc=fail header.from=bank.example\n"
+            "Received: from x (x [198.51.100.7]) by mx.example.com; Fri, 13 Nov 2026 10:00:00 +0000\n"
+            "From: Bank <alerts@bank.example>\nReply-To: claims@attacker.example\nList-Id: <news.attacker.example>\n"
+            "To: a@example.com\nSubject: hi\nDate: Fri, 13 Nov 2026 10:00:00 +0000\nMessage-ID: <1@bank.example>\n")
+    f = next(f for f in analyze(text)["findings"] if f["rule_id"] == "ESHA-108")
+    assert f["severity"] == "medium"

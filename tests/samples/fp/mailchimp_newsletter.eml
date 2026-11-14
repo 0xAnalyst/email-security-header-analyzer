@@ -1,0 +1,69 @@
+Delivered-To: analyst@example.com
+Received: by 2002:a05:7300:9c11:b0:12f:3a51:77e2 with SMTP id r17csp551201dyb;
+        Thu, 12 Nov 2026 16:02:12 -0800 (PST)
+Return-Path: <bounce-mc.us21_1234567.4471-analyst=example.com@mail162.suw121.mcdlv.net>
+Received: from mail162.suw121.mcdlv.net (mail162.suw121.mcdlv.net. [198.2.162.17])
+        by mx.google.com with ESMTPS id 5b1f17b1804b1-43a1c2d3e4fsi118842f8f.211.2026.11.13
+        for <analyst@example.com>
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Thu, 12 Nov 2026 16:02:12 -0800 (PST)
+Received-SPF: pass (google.com: domain of bounce-mc.us21_1234567.4471-analyst=example.com@mail162.suw121.mcdlv.net designates 198.2.162.17 as permitted sender) client-ip=198.2.162.17;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@northwind.example header.s=k2 header.b=dGVzdA==;
+       dkim=pass header.i=@mcdlv.net header.s=k3 header.b=dGVzdA==;
+       spf=pass (google.com: domain of bounce-mc.us21_1234567.4471-analyst=example.com@mail162.suw121.mcdlv.net designates 198.2.162.17 as permitted sender) smtp.mailfrom="bounce-mc.us21_1234567.4471-analyst=example.com@mail162.suw121.mcdlv.net";
+       dmarc=pass (p=QUARANTINE sp=QUARANTINE dis=NONE) header.from=northwind.example
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=northwind.example; s=k2; t=1794650000;
+        h=subject:from:reply-to:to:date:message-id:list-id:list-unsubscribe:list-unsubscribe-post:content-type:mime-version;
+        bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;
+        b=eS1TaGEtc3ludGhldGljLXNpZ25hdHVyZS1mb3ItdGVzdHMtb25seQ==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=mcdlv.net; s=k3; t=1794650000;
+        h=subject:from:reply-to:to:date:message-id:list-id:list-unsubscribe:list-unsubscribe-post:content-type:mime-version;
+        bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;
+        b=eS1TaGEtc3ludGhldGljLXNpZ25hdHVyZS1mb3ItdGVzdHMtb25seQ==
+BIMI-Location: v=BIMI1; l=https://northwind.example/bimi/logo.svg
+BIMI-Indicator: PHN2ZyB2ZXJzaW9uPSIxLjIiIGJhc2VQcm9maWxlPSJ0aW55LXBzIj48L3N2Zz4=
+From: Northwind Outfitters <news@northwind.example>
+Reply-To: Northwind Outfitters <hello@northwind.example>
+To: <analyst@example.com>
+Subject: New this week: winter jackets and trail shoes
+Date: Fri, 13 Nov 2026 00:02:09 +0000
+Message-ID: <a1b2c3d4e5.4471@mail162.suw121.mcdlv.net>
+List-Id: 1234567 mc list <1234567.xt.local>
+List-Unsubscribe: <https://northwind.us21.list-manage.com/unsubscribe?u=1&id=2>, <mailto:unsubscribe-mc.us21_1234567@unsubscribe.mailchimp.com>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+X-MC-User: 1234567
+Precedence: bulk
+Feedback-ID: 21:21.1234567:us21:mc
+Content-Type: multipart/alternative; boundary="esha-alt-boundary"
+MIME-Version: 1.0
+
+--esha-alt-boundary
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+TmV3IHRoaXMgd2VlayBhdCBOb3J0aHdpbmQgT3V0Zml0dGVyczogd2ludGVyIGphY2tldHMsIHRy
+YWlsIHNob2VzIGFuZCBhIGxheWVyaW5nIGd1aWRlLiBodHRwczovL25vcnRod2luZC51czIxLmxp
+c3QtbWFuYWdlLmNvbS90cmFjay9jbGljaz91PTE=
+
+--esha-alt-boundary
+Content-Type: text/html; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+PGh0bWw+PGJvZHk+PGltZyBzcmM9Imh0dHBzOi8vbm9ydGh3aW5kLnVzMjEubGlzdC1tYW5hZ2Uu
+Y29tL2xvZ28ucG5nIiB3aWR0aD0iMTgwIiBoZWlnaHQ9IjQwIiBhbHQ9Ik5vcnRod2luZCBPdXRm
+aXR0ZXJzIj48aDE+TmV3IHRoaXMgd2VlazwvaDE+PHA+SGVsbG8sIGhlcmUgaXMgd2hhdCBpcyBu
+ZXcgaW4gdGhlIE5vcnRod2luZCBPdXRmaXR0ZXJzIGNhdGFsb2d1ZSB0aGlzIHdlZWs6IHdpbnRl
+ciBqYWNrZXRzLCB0cmFpbCBzaG9lcyBhbmQgYSBndWlkZSB0byBsYXllcmluZyBmb3IgY29sZCBt
+b3JuaW5ncy4gTWVtYmVycyBnZXQgZnJlZSByZXR1cm5zIHVudGlsIHRoZSBlbmQgb2YgdGhlIG1v
+bnRoLCBhbmQgb3VyIHN0b3JlcyBub3cgb3BlbiBhdCBuaW5lIG9uIHdlZWtlbmRzLjwvcD48cD48
+YSBocmVmPSJodHRwczovL25vcnRod2luZC51czIxLmxpc3QtbWFuYWdlLmNvbS90cmFjay9jbGlj
+az91PTEiPlNob3AgdGhlIGNvbGxlY3Rpb248L2E+PC9wPjxwPjxhIGhyZWY9Imh0dHBzOi8vbm9y
+dGh3aW5kLnVzMjEubGlzdC1tYW5hZ2UuY29tL3Vuc3Vic2NyaWJlP3U9MSI+VW5zdWJzY3JpYmU8
+L2E+PC9wPjxpbWcgc3JjPSJodHRwczovL25vcnRod2luZC51czIxLmxpc3QtbWFuYWdlLmNvbS90
+cmFjay9vcGVuLnBocD91PTEiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGFsdD0iIj48L2JvZHk+PC9o
+dG1sPg==
+
+--esha-alt-boundary--

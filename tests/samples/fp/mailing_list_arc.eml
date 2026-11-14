@@ -1,0 +1,47 @@
+Delivered-To: analyst@example.com
+Received: by 2002:a05:7300:9c11:b0:12f:3a51:77e2 with SMTP id r17csp551201dyb;
+        Fri, 13 Nov 2026 08:13:20 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; t=1794650000; cv=pass; d=google.com; s=arc-20240605; b=c2VhbA==
+ARC-Authentication-Results: i=1; mx.google.com;
+       arc=pass (i=1 spf=pass spfdomain=fabrikam.example dkim=pass dkdomain=fabrikam.example dmarc=pass fromdomain=fabrikam.example);
+       dkim=fail header.i=@fabrikam.example header.s=s2026 header.b=dGVzdA==;
+       spf=pass (google.com: domain of dev-bounces@lists.example.org designates 140.211.11.131 as permitted sender) smtp.mailfrom=dev-bounces@lists.example.org;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE arc=pass) header.from=fabrikam.example
+Return-Path: <dev-bounces@lists.example.org>
+Received: from mail.lists.example.org (mail.lists.example.org. [140.211.11.131])
+        by mx.google.com with ESMTPS id 5b1f17b1804b1-43a1c2d3e4fsi118842f8f.211.2026.11.13
+        for <analyst@example.com>
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Fri, 13 Nov 2026 08:13:20 -0800 (PST)
+Received-SPF: pass (google.com: domain of dev-bounces@lists.example.org designates 140.211.11.131 as permitted sender) client-ip=140.211.11.131;
+Authentication-Results: mx.google.com;
+       arc=pass (i=1 spf=pass spfdomain=fabrikam.example dkim=pass dkdomain=fabrikam.example dmarc=pass fromdomain=fabrikam.example);
+       dkim=fail header.i=@fabrikam.example header.s=s2026 header.b=dGVzdA==;
+       spf=pass (google.com: domain of dev-bounces@lists.example.org designates 140.211.11.131 as permitted sender) smtp.mailfrom=dev-bounces@lists.example.org;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE arc=pass) header.from=fabrikam.example
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fabrikam.example; s=s2026; t=1794650000;
+        h=from:to:subject:date:message-id:content-type;
+        bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;
+        b=eS1TaGEtc3ludGhldGljLXNpZ25hdHVyZS1mb3ItdGVzdHMtb25seQ==
+From: Dana Whitfield <dana@fabrikam.example>
+To: dev@lists.example.org
+Subject: [dev] Re: Proposal: drop Python 3.8 support
+Date: Fri, 13 Nov 2026 16:12:58 +0000
+Message-ID: <CA+dana20261113161258@mail.fabrikam.example>
+In-Reply-To: <CA+maintainer20261112@mail.example.org>
+References: <CA+maintainer20261112@mail.example.org>
+List-Id: Developer discussion <dev.lists.example.org>
+List-Unsubscribe: <https://lists.example.org/mailman3/postorius/lists/dev.lists.example.org/>, <mailto:dev-leave@lists.example.org>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+List-Post: <mailto:dev@lists.example.org>
+Precedence: list
+Sender: dev-bounces@lists.example.org
+Reply-To: dev@lists.example.org
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+KzEgZnJvbSBtZS4gMy44IGhhcyBiZWVuIGVuZC1vZi1saWZlIGZvciBhIHdoaWxlIGFuZCB0aGUg
+Q0kgbWF0cml4IGlzIGdldHRpbmcgc2xvdy4KCkRhbmEKCl9fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fCmRldiBtYWlsaW5nIGxpc3QKaHR0cHM6Ly9saXN0cy5l
+eGFtcGxlLm9yZy9tYWlsbWFuMy9saXN0cy9kZXYubGlzdHMuZXhhbXBsZS5vcmcv

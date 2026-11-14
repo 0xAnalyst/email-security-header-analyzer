@@ -1,0 +1,57 @@
+Delivered-To: analyst@example.com
+Received: by 2002:a05:7300:9c11:b0:12f:3a51:77e2 with SMTP id r17csp551201dyb;
+        Fri, 13 Nov 2026 06:14:55 -0800 (PST)
+Return-Path: <bounces+1849502-ab12-analyst=example.com@em7781.tailspin.example>
+Received: from o1.ptr7781.tailspin.example (o1.ptr7781.tailspin.example. [167.89.101.44])
+        by mx.google.com with ESMTPS id 5b1f17b1804b1-43a1c2d3e4fsi118842f8f.211.2026.11.13
+        for <analyst@example.com>
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Fri, 13 Nov 2026 06:14:55 -0800 (PST)
+Received-SPF: pass (google.com: domain of bounces+1849502-ab12-analyst=example.com@em7781.tailspin.example designates 167.89.101.44 as permitted sender) client-ip=167.89.101.44;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@tailspin.example header.s=s1 header.b=dGVzdA==;
+       dkim=pass header.i=@sendgrid.info header.s=smtpapi header.b=dGVzdA==;
+       spf=pass (google.com: domain of bounces+1849502-ab12-analyst=example.com@em7781.tailspin.example designates 167.89.101.44 as permitted sender) smtp.mailfrom="bounces+1849502-ab12-analyst=example.com@em7781.tailspin.example";
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=tailspin.example
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=tailspin.example; s=s1; t=1794650000;
+        h=from:subject:mime-version:to:cc:content-type:date:message-id;
+        bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;
+        b=eS1TaGEtc3ludGhldGljLXNpZ25hdHVyZS1mb3ItdGVzdHMtb25seQ==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sendgrid.info; s=smtpapi; t=1794650000;
+        h=from:subject:mime-version:to:cc:content-type:date:message-id;
+        bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;
+        b=eS1TaGEtc3ludGhldGljLXNpZ25hdHVyZS1mb3ItdGVzdHMtb25seQ==
+From: Tailspin Toys <orders@tailspin.example>
+To: analyst@example.com
+Subject: Your order #44190 has shipped
+Date: Fri, 13 Nov 2026 14:14:52 +0000
+Message-ID: <Xk2p9Q7rS0eB1a2c3d4e5f@geopod-ismtpd-12>
+X-SG-EID: u001.ZXNoYS1zYW1wbGU=
+X-Entity-ID: u001.ZXNoYQ==
+Content-Type: multipart/alternative; boundary="esha-alt-boundary"
+MIME-Version: 1.0
+
+--esha-alt-boundary
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+SGksIHlvdXIgb3JkZXIgIzQ0MTkwIGhhcyBzaGlwcGVkIGFuZCBzaG91bGQgYXJyaXZlIG9uIFR1
+ZXNkYXkuIFRyYWNrIGl0IGF0IGh0dHBzOi8vd3d3LnRhaWxzcGluLmV4YW1wbGUvb3JkZXJzLzQ0
+MTkwLiBUaGFua3MgZm9yIHNob3BwaW5nIHdpdGggVGFpbHNwaW4gVG95cy4=
+
+--esha-alt-boundary
+Content-Type: text/html; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+PHA+SGksIHlvdXIgb3JkZXIgIzQ0MTkwIGhhcyBzaGlwcGVkIGFuZCBzaG91bGQgYXJyaXZlIG9u
+IFR1ZXNkYXkuIFlvdXIgcGFyY2VsIGNvbnRhaW5zIHR3byBpdGVtcywgYW5kIHRoZSBjb3VyaWVy
+IHdpbGwgbGVhdmUgaXQgd2l0aCBhIG5laWdoYm91ciBpZiB5b3UgYXJlIG91dC48L3A+PHA+PGEg
+aHJlZj0iaHR0cHM6Ly93d3cudGFpbHNwaW4uZXhhbXBsZS9vcmRlcnMvNDQxOTAiPlRyYWNrIHlv
+dXIgb3JkZXI8L2E+PC9wPjxwPlRoYW5rcyBmb3Igc2hvcHBpbmcgd2l0aCBUYWlsc3BpbiBUb3lz
+LjwvcD48aW1nIHNyYz0iaHR0cHM6Ly91MTg0OTUwMi5jdC5zZW5kZ3JpZC5uZXQvd2Yvb3Blbj91
+cG49YWJjIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBhbHQ9IiIgc3R5bGU9ImhlaWdodDoxcHghaW1w
+b3J0YW50Ij4=
+
+--esha-alt-boundary--

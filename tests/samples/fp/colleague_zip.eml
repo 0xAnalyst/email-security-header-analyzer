@@ -1,0 +1,48 @@
+Delivered-To: analyst@example.com
+Received: by 2002:a05:7300:9c11:b0:12f:3a51:77e2 with SMTP id r17csp551201dyb;
+        Fri, 13 Nov 2026 03:30:04 -0800 (PST)
+Return-Path: <tom.baker@example.com>
+Received: from mail-ed1-f44.google.com (mail-ed1-f44.google.com. [209.85.208.44])
+        by mx.google.com with ESMTPS id 5b1f17b1804b1-43a1c2d3e4fsi118842f8f.211.2026.11.13
+        for <analyst@example.com>
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Fri, 13 Nov 2026 03:30:04 -0800 (PST)
+Received-SPF: pass (google.com: domain of tom.baker@example.com designates 209.85.208.44 as permitted sender) client-ip=209.85.208.44;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@example.com header.s=google header.b=dGVzdA==;
+       spf=pass (google.com: domain of tom.baker@example.com designates 209.85.208.44 as permitted sender) smtp.mailfrom=tom.baker@example.com;
+       dmarc=pass (p=QUARANTINE sp=QUARANTINE dis=NONE) header.from=example.com
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com; s=google; t=1794650000;
+        h=mime-version:from:date:message-id:subject:to;
+        bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;
+        b=eS1TaGEtc3ludGhldGljLXNpZ25hdHVyZS1mb3ItdGVzdHMtb25seQ==
+From: Tom Baker <tom.baker@example.com>
+To: analyst@example.com
+Subject: Q3 report and appendix
+Date: Fri, 13 Nov 2026 11:29:51 +0000
+Message-ID: <CAOx7m1bQ3report20261113@mail.gmail.com>
+Content-Type: multipart/mixed; boundary="esha-sample-boundary"
+MIME-Version: 1.0
+
+--esha-sample-boundary
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+SGksCgpaaXBwZWQgdGhlIFEzIHJlcG9ydCBhbmQgdGhlIGFwcGVuZGl4IHRvZ2V0aGVyIHNpbmNl
+IHRoZSBhdHRhY2htZW50IGxpbWl0IGJpdCBtZSBsYXN0IHRpbWUuIExldCBtZSBrbm93IGlmIGFu
+eXRoaW5nIGlzIG1pc3NpbmcuCgpUb20=
+
+--esha-sample-boundary
+Content-Type: application/zip; Name="Q3_report.zip"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="Q3_report.zip"
+
+UEsDBBQAAAAAAABIbV1wf246IwAAACMAAAANAAAAUTNfcmVwb3J0LnBkZiVQREYtMS43CiUgRVNI
+QSBpbmVydCB0ZXN0IGZpeHR1cmUKUEsDBBQAAAAAAABIbV10U9q3EwAAABMAAAAPAAAAUTNfYXBw
+ZW5kaXgucGRmJVBERi0xLjcKJSBmaXh0dXJlClBLAQIUAxQAAAAAAABIbV1wf246IwAAACMAAAAN
+AAAAAAAAAAAAAACAAQAAAABRM19yZXBvcnQucGRmUEsBAhQDFAAAAAAAAEhtXXRT2rcTAAAAEwAA
+AA8AAAAAAAAAAAAAAIABTgAAAFEzX2FwcGVuZGl4LnBkZlBLBQYAAAAAAgACAHgAAACOAAAAAAA=
+
+--esha-sample-boundary--

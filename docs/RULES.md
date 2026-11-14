@@ -18,7 +18,7 @@ can take depending on context (for example when DMARC passes).
 | ESHA-009 | SPF error | low | 4 | authentication | – |
 | ESHA-010 | DKIM signature valid and aligned | pass | 0 | authentication | – |
 | ESHA-011 | DKIM signed by a different domain | medium (info) | 12 | authentication | [T1672](https://attack.mitre.org/techniques/T1672/), [T1656](https://attack.mitre.org/techniques/T1656/) |
-| ESHA-012 | DKIM failed | medium | 12 | authentication | – |
+| ESHA-012 | DKIM failed | medium (info) | 12 | authentication | – |
 | ESHA-013 | Message is not DKIM-signed | low | 4 | authentication | – |
 | ESHA-014 | DKIM signature present but no verification result | info | 0 | authentication | – |
 | ESHA-015 | Microsoft composite authentication failed | high (medium) | 25 | authentication | [T1672](https://attack.mitre.org/techniques/T1672/), [T1656](https://attack.mitre.org/techniques/T1656/) |
@@ -37,9 +37,9 @@ can take depending on context (for example when DMARC passes).
 | ESHA-105 | Sent from a free webmail provider | info | 0 | identity | [T1585.002](https://attack.mitre.org/techniques/T1585/002/) |
 | ESHA-106 | From header missing or unparseable | medium | 12 | identity | – |
 | ESHA-107 | Reply-To imitates the sender's domain | critical | 40 | identity | [T1656](https://attack.mitre.org/techniques/T1656/), [T1583.001](https://attack.mitre.org/techniques/T1583/001/) |
-| ESHA-108 | Reply-To differs from From | medium | 12 | identity | [T1656](https://attack.mitre.org/techniques/T1656/) |
+| ESHA-108 | Reply-To differs from From | medium (info) | 12 | identity | [T1656](https://attack.mitre.org/techniques/T1656/) |
 | ESHA-109 | Return-Path differs from From | info | 0 | identity | – |
-| ESHA-110 | Sender header differs from From | low | 4 | identity | – |
+| ESHA-110 | Sender header differs from From | low (info) | 4 | identity | – |
 | ESHA-120 | Sent through an email service provider | info | 0 | identity | – |
 | ESHA-201 | No Received headers | medium | 12 | routing | – |
 | ESHA-202 | Sending server has no reverse DNS | low | 4 | routing | – |
@@ -63,7 +63,7 @@ can take depending on context (for example when DMARC passes).
 | ESHA-321 | List-Unsubscribe without one-click | info | 0 | message | – |
 | ESHA-322 | Subject looks like a reply, but the message isn't part of a thread | low | 4 | message | [T1566](https://attack.mitre.org/techniques/T1566/), [T1656](https://attack.mitre.org/techniques/T1656/) |
 | ESHA-323 | Thread headers with a new subject | info | 0 | message | – |
-| ESHA-324 | Reply from a look-alike of a thread participant's domain | high | 25 | message | [T1534](https://attack.mitre.org/techniques/T1534/), [T1656](https://attack.mitre.org/techniques/T1656/), [T1586.002](https://attack.mitre.org/techniques/T1586/002/) |
+| ESHA-324 | Reply from a look-alike of a thread participant's domain | critical (high) | 40 | message | [T1534](https://attack.mitre.org/techniques/T1534/), [T1656](https://attack.mitre.org/techniques/T1656/), [T1586.002](https://attack.mitre.org/techniques/T1586/002/) |
 | ESHA-401 | Disguised attachment | critical | 40 | content | [T1566.001](https://attack.mitre.org/techniques/T1566/001/), [T1036.007](https://attack.mitre.org/techniques/T1036/007/), [T1204.002](https://attack.mitre.org/techniques/T1204/002/) |
 | ESHA-402 | Risky attachment | high | 25 | content | [T1566.001](https://attack.mitre.org/techniques/T1566/001/), [T1204.002](https://attack.mitre.org/techniques/T1204/002/) |
 | ESHA-403 | Archive attachment | low | 4 | content | – |

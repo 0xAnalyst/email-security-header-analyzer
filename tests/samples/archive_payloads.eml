@@ -1,0 +1,55 @@
+Delivered-To: analyst@example.com
+Received: by 2002:a05:7300:9c11:b0:12f:3a51:77e2 with SMTP id r17csp551201dyb;
+        Fri, 13 Nov 2026 07:12:44 -0800 (PST)
+Return-Path: <billing@invoices-portal.example>
+Received: from vps-2291.hosting.example (vps-2291.hosting.example. [45.141.84.120])
+        by mx.google.com with ESMTPS id 5b1f17b1804b1-43a1c2d3e4fsi118842f8f.211.2026.11.13
+        for <analyst@example.com>
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Fri, 13 Nov 2026 07:12:44 -0800 (PST)
+Received-SPF: pass (google.com: domain of billing@invoices-portal.example designates 45.141.84.120 as permitted sender) client-ip=45.141.84.120;
+Authentication-Results: mx.google.com;
+       spf=softfail (google.com: domain of transitioning billing@invoices-portal.example does not designate 45.141.84.120 as permitted sender) smtp.mailfrom=billing@invoices-portal.example;
+       dmarc=fail (p=QUARANTINE sp=QUARANTINE dis=QUARANTINE) header.from=invoices-portal.example
+From: Billing Department <billing@invoices-portal.example>
+To: analyst@example.com
+Subject: Invoice 88213 overdue
+Date: Fri, 13 Nov 2026 15:11:58 +0000
+Message-ID: <5f2e1c9a.88213@invoices-portal.example>
+Content-Type: multipart/mixed; boundary="esha-sample-boundary"
+MIME-Version: 1.0
+
+--esha-sample-boundary
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+SGVsbG8sCgpZb3VyIGludm9pY2UgaXMgb3ZlcmR1ZS4gVGhlIGRvY3VtZW50cyBhcmUgYXR0YWNo
+ZWQuCgpBcmNoaXZlIHBhc3N3b3JkOiA4ODIxMwoKQmlsbGluZyBEZXBhcnRtZW50
+
+--esha-sample-boundary
+Content-Type: application/zip; Name="Invoice_88213.zip"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="Invoice_88213.zip"
+
+UEsDBBQAAQAAAABIbV1mWjCvGwAAABsAAAAQAAAASW52b2ljZV84ODIxMy5qcy8vIEVTSEEgaW5l
+cnQgdGVzdCBmaXh0dXJlClBLAwQUAAEAAAAASG1drSQC2QsAAAALAAAACgAAAHJlYWRtZS50eHRz
+ZWUgaW52b2ljZVBLAQIUAxQAAQAAAABIbV1mWjCvGwAAABsAAAAQAAAAAAAAAAAAAACAAQAAAABJ
+bnZvaWNlXzg4MjEzLmpzUEsBAhQDFAABAAAAAEhtXa0kAtkLAAAACwAAAAoAAAAAAAAAAAAAAIAB
+SQAAAHJlYWRtZS50eHRQSwUGAAAAAAIAAgB2AAAAfAAAAAAA
+
+--esha-sample-boundary
+Content-Type: application/zip; Name="Statements.zip"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="Statements.zip"
+
+UEsDBBQAAAAAAABIbV0XWk77owAAAKMAAAAQAAAAU3RhdGVtZW50X1E0LnppcFBLAwQUAAAAAAAA
+SG1dZlowrxsAAAAbAAAAEwAAAFN0YXRlbWVudF9RNC5wZGYuanMvLyBFU0hBIGluZXJ0IHRlc3Qg
+Zml4dHVyZQpQSwECFAMUAAAAAAAASG1dZlowrxsAAAAbAAAAEwAAAAAAAAAAAAAAgAEAAAAAU3Rh
+dGVtZW50X1E0LnBkZi5qc1BLBQYAAAAAAQABAEEAAABMAAAAAABQSwECFAMUAAAAAAAASG1dF1pO
++6MAAACjAAAAEAAAAAAAAAAAAAAAgAEAAAAAU3RhdGVtZW50X1E0LnppcFBLBQYAAAAAAQABAD4A
+AADRAAAAAAA=
+
+--esha-sample-boundary--

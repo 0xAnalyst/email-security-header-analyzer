@@ -97,7 +97,7 @@ BRANDS = {
 LEGIT_EXTRA = {
     "amazonses.com", "amazonaws.com", "amazon.co.uk", "microsoftonline.com", "office365.com",
     "microsoft365.com", "outlook.office365.com", "googlemail.com", "google.co.uk", "youtube.com",
-    "paypal-communication.com", "paypal-corp.com", "linkedinmail.com", "facebookmail.com",
+    "paypal-communication.com", "googlegroups.com", "googleusercontent.com", "google.com.au", "paypal-corp.com", "linkedinmail.com", "facebookmail.com",
     "appleid.apple.com", "docusign.com", "githubusercontent.com", "zoom.com", "slackhq.com",
     "salesforce.com", "exacttarget.com", "netflix.net", "dropboxmail.com", "adobesign.com",
     "dhl.de", "fedex.com", "ups.com", "stripe.network", "alrajhibank.com.sa",

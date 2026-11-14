@@ -9,6 +9,7 @@ from email import policy
 from html.parser import HTMLParser
 from urllib.parse import unquote, urlsplit
 
+from .attachments import html_smuggling, inspect_container, parse_ics
 from .domains import aligned, is_punycode, lookalike_brand, org_domain
 
 SHORTENERS = {
@@ -47,6 +48,14 @@ class _HTML(HTMLParser):
         self._a: dict | None = None
         self.has_password = False
         self.scripts = 0
+        self.text: list[str] = []
+        self.images: list[dict] = []
+        self._skip = 0  # inside <script>, <style>, <title> or <head>
+
+    @staticmethod
+    def _px(value) -> int | None:
+        m = re.match(r"\s*(\d{1,5})", value or "")
+        return int(m.group(1)) if m else None
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
@@ -61,6 +70,14 @@ class _HTML(HTMLParser):
             self.has_password = True
         elif tag == "script":
             self.scripts += 1
+        if tag in ("script", "style", "title", "head"):
+            self._skip += 1
+        if tag == "img" and len(self.images) < 500:
+            style = (a.get("style") or "").replace(" ", "").lower()
+            w = self._px(a.get("width")) if a.get("width") else self._px((re.search(r"width:(\d+)", style) or [None, ""])[1])
+            h = self._px(a.get("height")) if a.get("height") else self._px((re.search(r"height:(\d+)", style) or [None, ""])[1])
+            self.images.append({"src": (a.get("src") or "").strip()[:500], "width": w, "height": h,
+                                "hidden": "display:none" in style or "visibility:hidden" in style})
         elif tag in ("meta",) and (a.get("http-equiv") or "").lower() == "refresh":
             m = re.search(r"url=(.+)", a.get("content") or "", re.I)
             if m:
@@ -69,8 +86,12 @@ class _HTML(HTMLParser):
     def handle_data(self, data):
         if self._a is not None:
             self._a["text"] += data
+        if not self._skip and len(self.text) < 20000:
+            self.text.append(data)
 
     def handle_endtag(self, tag):
+        if tag in ("script", "style", "title", "head") and self._skip:
+            self._skip -= 1
         if tag == "a" and self._a is not None:
             self._a["text"] = " ".join(self._a["text"].split())[:200]
             self.links.append(self._a)
@@ -132,6 +153,28 @@ def _link_flags(href: str, text: str, from_domain: str) -> list[str]:
     return flags
 
 
+QR_WORDING = re.compile(r"\b(qr[\s-]?code|scan (?:the|this|below|attached|my) (?:code|image|barcode)|scan (?:it )?with your "
+                        r"(?:phone|camera|mobile|smartphone))\b", re.IGNORECASE)
+
+
+PASSWORD_HINT = re.compile(r"\b(?:password|passcode|passwort|kennwort|mot de passe|contrase(?:ñ|n)a|pwd|pw)\b\s*(?:is|:|=|-)?\s*\S{3,}",
+                           re.IGNORECASE)
+
+
+def _words(text: str) -> int:
+    return len(re.findall(r"[^\W\d_]{2,}", text or ""))
+
+
+def _image_summary(images: list[dict], inline_parts: int, attached: int) -> dict:
+    remote = [i for i in images if i["src"].lower().startswith(("http://", "https://", "//"))]
+    pixels = [i for i in remote if i["hidden"] or ((i["width"] is not None and i["width"] <= 2)
+                                                    and (i["height"] is None or i["height"] <= 2))
+              or (i["height"] is not None and i["height"] <= 2 and i["width"] is None)]
+    return {"html_images": len(images), "remote": len(remote), "inline_parts": inline_parts, "attached": attached,
+            "tracking_pixels": len(pixels), "remote_hosts": sorted({_host(i["src"] if not i["src"].startswith("//")
+                                                                          else "https:" + i["src"]) for i in remote} - {""})[:20]}
+
+
 def analyze_body(raw: str, from_domain: str = "") -> dict | None:
     """Returns None when the input has no body (headers only)."""
     msg = email.message_from_string(raw, policy=policy.default)
@@ -144,6 +187,17 @@ def analyze_body(raw: str, from_domain: str = "") -> dict | None:
     has_password = False
     scripts = 0
     text_seen = set()
+    text_parts: list[str] = []
+    images: list[dict] = []
+    inline_images = attached_images = 0
+    calendars: list[dict] = []
+
+    def add_calendar(text: str, source: str):
+        ics = parse_ics(text)
+        ics["source"] = source
+        calendars.append(ics)
+        for u in ics["links"]:
+            links.append({"href": u, "text": "", "source": source})
 
     for part in msg.walk():
         if part.is_multipart():
@@ -158,6 +212,11 @@ def analyze_body(raw: str, from_domain: str = "") -> dict | None:
                 payload = b""
             name = fname or "(unnamed)"
             ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+            if ctype.startswith("image/"):
+                if part.get("Content-ID") and disp != "attachment":
+                    inline_images += 1
+                else:
+                    attached_images += 1
             kind = RISKY_EXT.get(ext)
             double = bool(re.search(r"\.(pdf|docx?|xlsx?|jpe?g|png|txt)\.[a-z0-9]{2,4}$", name, re.I))
             sniff = ""
@@ -167,12 +226,22 @@ def analyze_body(raw: str, from_domain: str = "") -> dict | None:
                 sniff = "ZIP archive"
             elif b"<html" in payload[:2048].lower() or b"<script" in payload[:4096].lower():
                 sniff = "HTML" if ext not in ("html", "htm") else ""
+            is_html = ctype in ("text/html", "image/svg+xml") or ext in ("html", "htm", "shtml", "xhtml", "svg")
+            try:
+                container = inspect_container(payload, ext)
+            except Exception:
+                container = None
             attachments.append({
                 "filename": name, "content_type": ctype, "size": len(payload), "extension": ext,
                 "kind": kind, "risky": bool(kind in HIGH_RISK_KINDS or double or sniff == "Windows executable"),
                 "double_extension": double, "content_mismatch": sniff,
+                "container": container,
+                "smuggling": html_smuggling(payload.decode("utf-8", "replace")) if is_html else [],
             })
-            if ctype in ("text/html",) or ext in ("html", "htm", "shtml", "xhtml", "svg"):
+            if ctype == "text/calendar" or ext in ("ics", "ical", "ifb", "vcs"):
+                add_calendar(payload.decode("utf-8", "replace"), f"calendar invite ({name})")
+                continue
+            if is_html:
                 try:
                     p = _HTML()
                     p.feed(payload.decode("utf-8", "replace"))
@@ -191,12 +260,17 @@ def analyze_body(raw: str, from_domain: str = "") -> dict | None:
             content = (part.get_payload(decode=True) or b"").decode("utf-8", "replace")
         if not isinstance(content, str):
             continue
+        if ctype == "text/calendar":
+            add_calendar(content, "calendar invite")
+            continue
         if ctype == "text/html":
             p = _HTML()
             try:
                 p.feed(content)
             except Exception:
                 pass
+            text_parts.append(" ".join(p.text))
+            images += p.images
             for lk in p.links:
                 lk["source"] = "body"
                 links.append(lk)
@@ -205,6 +279,7 @@ def analyze_body(raw: str, from_domain: str = "") -> dict | None:
             has_password |= p.has_password
             scripts += p.scripts
         else:
+            text_parts.append(content[:200_000])
             for u in URL_RE.findall(content):
                 u = u.rstrip(".,;:!?")
                 if u not in text_seen:
@@ -230,4 +305,9 @@ def analyze_body(raw: str, from_domain: str = "") -> dict | None:
         "forms": forms,
         "password_field": has_password,
         "scripts": scripts,
+        "text_words": max((_words(t) for t in text_parts), default=0),
+        "qr_wording": (QR_WORDING.search(" ".join(text_parts)) or [""])[0],
+        "password_in_text": bool(PASSWORD_HINT.search(" ".join(text_parts))),
+        "images": _image_summary(images, inline_images, attached_images),
+        "calendar": calendars,
     }

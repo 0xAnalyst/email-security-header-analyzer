@@ -110,7 +110,8 @@ _RULES = [
          "Check whether the signing domain is a service the sender is known to use.", _SPOOF, also=("info",)),
     Rule("ESHA-012", "dkim-fail", "DKIM failed", "medium", "authentication",
          "A DKIM signature was present but did not verify; the message may have been altered in transit.",
-         "Mailing lists and forwarding can break signatures. Without that explanation, assume tampering."),
+         "Mailing lists and forwarding can break signatures. Without that explanation, assume tampering.",
+         also=("info",)),
     Rule("ESHA-013", "dkim-none", "Message is not DKIM-signed", "low", "authentication",
          "No DKIM signature, so the content and From address are not cryptographically protected."),
     Rule("ESHA-014", "dkim-unverified", "DKIM signature present but no verification result", "info", "authentication",
@@ -168,11 +169,12 @@ _RULES = [
          "Do not reply. " + _VERIFY + " Block the look-alike domain.", ("T1656", "T1583.001")),
     Rule("ESHA-108", "reply-to-mismatch", "Reply-To differs from From", "medium", "identity",
          "Replies go to a different organisation than the sender.",
-         "Before replying, check that the Reply-To address belongs to the person you expect.", ("T1656",)),
+         "Before replying, check that the Reply-To address belongs to the person you expect.", ("T1656",),
+         also=("info",)),
     Rule("ESHA-109", "return-path-mismatch", "Return-Path differs from From", "info", "identity",
          "Bounces go to another domain, which is normal for mailing services."),
     Rule("ESHA-110", "sender-mismatch", "Sender header differs from From", "low", "identity",
-         "The Sender header names another mailbox than From."),
+         "The Sender header names another mailbox than From.", also=("info",)),
     Rule("ESHA-120", "esp-detected", "Sent through an email service provider", "info", "identity",
          "The message was sent through a known email service provider (ESP). Envelope, DKIM and Message-ID "
          "domains belonging to that ESP are expected and explained in the other findings."),
@@ -230,11 +232,11 @@ _RULES = [
     Rule("ESHA-323", "thread-subject-mismatch", "Thread headers with a new subject", "info", "message",
          "In-Reply-To or References point to an earlier conversation, but the subject isn't a reply or forward. "
          "Normal for many notification systems; in a personal thread it can be a sign of hijacking."),
-    Rule("ESHA-324", "thread-hijack-lookalike", "Reply from a look-alike of a thread participant's domain", "high", "message",
+    Rule("ESHA-324", "thread-hijack-lookalike", "Reply from a look-alike of a thread participant's domain", "critical", "message",
          "The message continues an existing thread but comes from a domain that imitates one of the participants' "
          "domains, the pattern of thread hijacking after a mailbox compromise.",
          "Contact the real participant through a known channel. Check whether their mailbox was compromised.",
-         ("T1534", "T1656", "T1586.002")),
+         ("T1534", "T1656", "T1586.002"), also=("high",)),
 
     # ---------------------------------------------------------------- content
     Rule("ESHA-401", "disguised-attachment", "Disguised attachment", "critical", "content",
