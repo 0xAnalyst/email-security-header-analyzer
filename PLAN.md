@@ -114,6 +114,13 @@ section adds archive and disk-image listings and invite details. All content is 
 `textContent`, and the CSP is unchanged.
 
 ## Phase 2: Inputs and outputs for analysts (summary)
+
+**Status: partly done (November 2026), released as 1.1.0.**
+- Done: the IOC panel and export (CSV, JSON, STIX 2.1, MISP), attachment hashes, the HTML report and
+  the print layout. All are exported by one Python module (`esha/core/exports.py`) shared by the UI,
+  the API (`?format=`, `/api/export`), the CLI (`-f`, `-o`) and the in-browser engine.
+- Still to do: `.mbox` and batch mode, and `.msg` support (waiting on approval of the `extract-msg`
+  dependency).
 - `.msg` support through the optional `extract-msg` extra (**I'll ask first**, because it pulls in
   several packages). `.mbox` support through the stdlib `mailbox` module.
 - `python -m esha batch <folder|file.mbox> --csv out.csv --json out.jsonl` and

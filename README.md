@@ -55,6 +55,11 @@ Built for SOC analysts, incident responders and IT admins who triage suspicious 
 
 **Spam filters**: Microsoft 365 (SCL, BCL, SFV, CAT such as `SPOOF` or `PHSH`) and SpamAssassin verdicts.
 
+**Indicators and export**
+- An Indicators tab lists the sender's IPs, domains, email addresses, URLs (raw or defanged) and attachment SHA-256/MD5 hashes, each with its role (origin, reply-to, link, and so on) and whether it looks suspicious. Recipients and your own mail servers are left out.
+- Export the indicators as CSV, JSON, a STIX 2.1 bundle or a MISP event. In STIX and MISP, only suspicious items become indicators or `to_ids` attributes, so benign mail services aren't marked malicious.
+- **HTML report** saves one self-contained file for a ticket: no scripts, nothing loaded, and links defanged. Printing the page also includes every tab.
+
 Every result is combined into a 0–100 risk score. Each finding has a plain-language explanation, advice on what to do and its MITRE ATT&CK techniques. The report is split into tabs: Findings, Route, Authentication, Links & attachments (when the message body is included) and All headers. The score is heuristic: treat it as triage, not proof.
 
 ## Use it in your browser
@@ -107,7 +112,15 @@ python -m esha analyze message.eml            # colour report in the terminal
 python -m esha analyze message.eml --json     # full JSON report
 pbpaste | python -m esha analyze -            # headers from the clipboard (macOS)
 ```
-`analyze` exits with code 2 when the verdict is high risk, so it can be used in scripts.
+Other formats, to standard output or a file with `-o`:
+```sh
+python -m esha analyze message.eml -f html -o report.html     # self-contained report for a ticket
+python -m esha analyze message.eml -f csv                     # indicators as CSV
+python -m esha analyze message.eml -f stix -o bundle.json     # STIX 2.1 bundle
+python -m esha analyze message.eml -f misp -o event.json      # MISP event
+python -m esha analyze message.eml -f iocs                    # indicators as JSON
+```
+`analyze` exits with code 2 when the verdict is high risk, so it can be used in scripts. `--json` keeps its original behaviour and always exits 0.
 
 ## API
 
@@ -116,9 +129,13 @@ curl -s localhost:8080/api/analyze -H 'Content-Type: application/json' -d '{"hea
 curl -s localhost:8080/api/analyze -F file=@message.eml
 curl -s localhost:8080/api/analyze -H 'Content-Type: message/rfc822' --data-binary @message.eml
 curl -s localhost:8080/api/health
+
+# other formats: csv, iocs, stix, misp, html
+curl -s 'localhost:8080/api/analyze?format=stix' -F file=@message.eml -o bundle.json
+curl -s localhost:8080/api/export -H 'Content-Type: application/json' -d '{"report": {...}, "format": "misp"}'
 ```
 
-The response contains `score`, `findings` (each with `rule_id`, `severity`, `title`, `detail`, `category`, `weight`, `description`, `remediation` and `attack`), `auth` (including the `alignment` table), `hops`, `origin`, `content` (links and attachments), `spam`, `summary` and the decoded `headers`.
+Reports only gain fields within a major version (see [CHANGELOG.md](CHANGELOG.md)). The response contains `iocs`, `score`, `findings` (each with `rule_id`, `severity`, `title`, `detail`, `category`, `weight`, `description`, `remediation` and `attack`), `auth` (including the `alignment` table), `hops`, `origin`, `content` (links and attachments), `spam`, `summary` and the decoded `headers`.
 
 ## Detection rules and scoring
 
@@ -165,7 +182,7 @@ The databases are saved to `esha/static/data`. To keep them elsewhere, use `--de
 
 ```sh
 pip install -r requirements-dev.txt
-pytest            # 124 tests, including attack samples and a false-positive corpus in tests/samples
+pytest            # 138 tests, including attack samples and a false-positive corpus in tests/samples
 ruff check esha tests
 ```
 
@@ -181,6 +198,8 @@ Project layout:
 | `esha/core/esp.py` | Email service provider recognition |
 | `esha/core/rules.py` | Detection rule registry (IDs, ATT&CK, advice) |
 | `esha/core/scoring.py` | Score weights and thresholds (`esha.json`, `ESHA_WEIGHTS`) |
+| `esha/core/iocs.py` | Indicator extraction and defanging |
+| `esha/core/exports.py` | CSV, JSON, STIX 2.1, MISP and HTML report exports |
 | `esha/core/analyzer.py` | Findings, alignment and scoring |
 | `esha/app.py` | Flask web app and JSON API |
 | `esha/__main__.py` | Command line |
