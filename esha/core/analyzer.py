@@ -188,6 +188,14 @@ def analyze(text: str, from_file: bool = False, config: ScoringConfig | None = N
         "last": timed[-1].timestamp.isoformat() if timed else None,
         "slowest_hop": max(hops, key=lambda h: h.delay or 0).index if any(h.delay for h in hops) else None,
     }
+    # Delivery time, as Microsoft's Message Header Analyzer shows it: from the Date header
+    # (when the sender's client created the message) to the last relay's timestamp.
+    delivered = timed[-1].timestamp if timed else None
+    summary["delivered_utc"] = delivered.astimezone(timezone.utc).isoformat() if delivered else None
+    try:
+        summary["delivery_seconds"] = (delivered - date_dt).total_seconds() if delivered and date_dt else None
+    except TypeError:  # naive vs aware datetimes
+        summary["delivery_seconds"] = None
 
     # ---------------------------------------------------------- authentication
     ar_list = [A.parse_authentication_results(v) for v in hmap.get("authentication-results", [])]

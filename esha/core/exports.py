@@ -248,6 +248,17 @@ def _dur(sec) -> str:
     return " ".join(parts[:2])
 
 
+def _delivered(s: dict) -> str:
+    if not s.get("delivered_utc"):
+        return ""
+    ds = s.get("delivery_seconds")
+    if ds is None:
+        return s["delivered_utc"]
+    if ds >= 0:
+        return f"{s['delivered_utc']} (delivered after {_dur(ds) if ds >= 1 else 'less than a second'})"
+    return f"{s['delivered_utc']} ({_dur(-ds)} before the Date header: wrong sender clock or forged Date)"
+
+
 def _table(headers, rows) -> str:
     head = "".join(f"<th>{_e(h)}</th>" for h in headers)
     return f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
@@ -273,7 +284,7 @@ def to_html(report: dict, iocs: dict) -> str:
 <div class="verdict {_e(score['level'])}">{_e(score['label'])}: {_e(score['value'])}/100</div>"""]
 
     rows = [("From", (s.get("from") or {}).get("raw")), ("Reply-To", ", ".join(r.get("address", "") for r in s.get("reply_to") or [])),
-            ("To", ", ".join(r.get("address", "") for r in s.get("to") or [])), ("Date", s.get("date_utc") or s.get("date")),
+            ("To", ", ".join(r.get("address", "") for r in s.get("to") or [])), ("Created", s.get("date_utc") or s.get("date")), ("Delivered", _delivered(s)),
             ("Message-ID", s.get("message_id")), ("Sent through", (s.get("esp") or {}).get("name"))]
     if report.get("origin"):
         o = report["origin"]

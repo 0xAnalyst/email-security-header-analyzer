@@ -290,7 +290,14 @@
     if (sm.reply_to && sm.reply_to.length) row("Reply-To", list(sm.reply_to));
     row("To", list(sm.to));
     row("Cc", list(sm.cc));
-    row("Sent", sm.date_utc ? fmtTime(sm.date_utc) : sm.date);
+    // Created = the Date header (sender's clock); Delivered = the last relay's timestamp.
+    row("Created", sm.date_utc ? fmtTime(sm.date_utc) : sm.date);
+    if (sm.delivered_utc) {
+      var ds = sm.delivery_seconds, note = null;
+      if (ds != null && ds >= 0) note = h("span", { class: "deliv" }, " (delivered after " + (ds < 1 ? "less than a second" : dur(ds)) + ")");
+      else if (ds != null) note = h("span", { class: "deliv warn" }, " (" + dur(-ds) + " before the Date header: the sender's clock is wrong or the Date was forged)");
+      row("Delivered", h("span", {}, fmtTime(sm.delivered_utc), note));
+    }
     if (r.origin) row("Origin", h("span", {}, flag(r.origin.geo), h("span", { class: "addr", text: r.origin.ip }), " ", geoText(r.origin.geo)));
 
     var dmNote = a.dmarc.computed && a.dmarc.result !== "unknown" ? "computed" : (a.dmarc.policy ? "p=" + a.dmarc.policy.toLowerCase() : "");

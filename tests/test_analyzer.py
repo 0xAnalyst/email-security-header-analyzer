@@ -285,3 +285,21 @@ def test_footer_credits_mha_and_links_source(client):
     html = client.get("/").get_data(as_text=True)
     assert "MHA by lnxg33k" in html and "GPL-3.0" in html
     assert 'href="https://github.com/0xAnalyst/email-security-header-analyzer">Source code</a>' in html
+
+
+def test_created_and_delivered_times():
+    s = analyze(load("legit_github.eml"), from_file=True)["summary"]
+    assert s["date_utc"].startswith("2026-11-09T17:14:06") and s["delivered_utc"].startswith("2026-11-09T17:14:07")
+    assert s["delivery_seconds"] == 1
+    forged = analyze(load("phish_paypal.eml"), from_file=True)["summary"]
+    assert forged["delivery_seconds"] < 0, "Date later than the last relay is reported as negative"
+    none = analyze("From: a@example.com\nSubject: x\n")["summary"]
+    assert none["delivered_utc"] is None and none["delivery_seconds"] is None
+
+
+def test_delivery_time_in_html_report():
+    from esha.core.exports import export
+    page = export(analyze(load("esp_spoof_payload.eml"), from_file=True), "html")[0]
+    assert "delivered after 2 s" in page
+    page = export(analyze(load("phish_paypal.eml"), from_file=True), "html")[0]
+    assert "before the Date header" in page

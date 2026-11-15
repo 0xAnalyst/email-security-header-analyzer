@@ -4,6 +4,15 @@ All notable changes to ESHA. The format follows [Keep a Changelog](https://keepa
 and versions follow [Semantic Versioning](https://semver.org/). The JSON report only gains fields within
 a major version; existing fields are never renamed or removed.
 
+## [1.2.1] - 2026-11-15
+
+### Added
+- **Created and Delivered times** in place of "Sent", as in Microsoft's Message Header Analyzer:
+  Created is the Date header and Delivered is the last relay's time, followed by "delivered after …". When
+  the last relay is earlier than the Date header, ESHA says so (wrong sender clock or forged Date) instead
+  of showing a negative delay. They're also in the HTML report, the command line and the JSON report
+  (`summary.delivered_utc`, `summary.delivery_seconds`).
+
 ## [1.2.0] - 2026-11-14
 
 ### Added

@@ -21,6 +21,15 @@ SEV_COLOR = {"critical": "\033[1;97;41m", "high": "\033[1;31m", "medium": "\033[
 RESET = "\033[0m"
 
 
+def _human(seconds: float) -> str:
+    s, parts = int(round(seconds)), []
+    for unit, size in (("d", 86400), ("h", 3600), ("min", 60), ("s", 1)):
+        if s >= size or (unit == "s" and not parts):
+            parts.append(f"{s // size} {unit}")
+            s %= size
+    return " ".join(parts[:2])
+
+
 def _port_free(host: str, port: int) -> bool:
     import socket
     family = socket.AF_INET6 if ":" in host else socket.AF_INET
@@ -97,16 +106,21 @@ def _analyze(args):
     s = report["summary"]
     print(f"\n{c('high' if report['score']['level']=='high' else report['score']['level'] if report['score']['level']!='low' else 'pass')}"
           f"■ {report['score']['label']}  ({report['score']['value']}/100){r}\n")
-    print(f"  Subject : {s['subject']}")
-    print(f"  From    : {s['from']['raw']}")
-    print(f"  Date    : {s['date']}")
+    print(f"  Subject   : {s['subject']}")
+    print(f"  From      : {s['from']['raw']}")
+    print(f"  Created   : {s['date']}")
+    if s.get("delivered_utc"):
+        ds = s.get("delivery_seconds")
+        when = "" if ds is None else (f"  (after {_human(ds)})" if ds >= 0 else f"  ({_human(-ds)} before the Date header)")
+        stamp = s["delivered_utc"].replace("T", " ").replace("+00:00", " UTC")
+        print(f"  Delivered : {stamp}{when}")
     a = report["auth"]
-    print(f"  Auth    : SPF={a['spf']['result']}  DKIM={a['dkim']['result']}  DMARC={a['dmarc']['result']}"
+    print(f"  Auth      : SPF={a['spf']['result']}  DKIM={a['dkim']['result']}  DMARC={a['dmarc']['result']}"
           f"{' (computed)' if a['dmarc']['computed'] else ''}")
     if report["origin"]:
         o = report["origin"]
         g = o.get("geo") or {}
-        print(f"  Origin  : {o['ip']} {g.get('country', '')} {('AS' + str(g['asn'])) if g.get('asn') else ''}")
+        print(f"  Origin    : {o['ip']} {g.get('country', '')} {('AS' + str(g['asn'])) if g.get('asn') else ''}")
     print("\n  Findings")
     for f in report["findings"]:
         print(f"   {c(f['severity'])}{f['severity'].upper():8}{r} {f['title']}" + (f" — {f['detail']}" if f["detail"] else ""))
